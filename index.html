@@ -1,0 +1,2730 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MOON — ვიდეო მონტაჟის კალკულატორი</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #08080d;
+    --bg-alt: #0d0d15;
+    --panel: #12121c;
+    --panel-2: #171724;
+    --border: #26263a;
+    --border-soft: #1c1c2b;
+    --text: #f1f1f6;
+    --text-dim: #8b8ba3;
+    --text-faint: #55556b;
+    --purple: #9b5cff;
+    --purple-soft: rgba(155,92,255,0.35);
+    --cyan: #2ee6d6;
+    --cyan-soft: rgba(46,230,214,0.35);
+    --warn: #ff6b6b;
+    --warn-soft: rgba(255,107,107,0.35);
+    --gold: #ffd27a;
+    --tg: #2ea6ff;
+    --tg-soft: rgba(46,166,255,0.35);
+    --wa: #25D366;
+  }
+
+  *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+
+  html,body{
+    margin:0; padding:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Space Grotesk', sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+
+  /* ---------- Background atmosphere ---------- */
+  .bg-layer{
+    position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;
+  }
+  .grain{
+    position:absolute; inset:-100px;
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(255,255,255,0.02) 0, transparent 1px);
+    background-size: 3px 3px;
+    opacity:0.5;
+  }
+  .ruler{
+    position:absolute; inset:0;
+    background-image: repeating-linear-gradient(
+      90deg,
+      rgba(255,255,255,0.028) 0px,
+      rgba(255,255,255,0.028) 1px,
+      transparent 1px,
+      transparent 80px
+    );
+    opacity:0.6;
+    mask-image: linear-gradient(180deg, transparent, black 15%, black 85%, transparent);
+  }
+  .orb{
+    position:absolute; border-radius:50%;
+    filter:blur(70px);
+    opacity:0.35;
+    will-change:transform;
+    transform:translateZ(0);
+  }
+  .orb.o1{ width:520px; height:520px; top:-160px; left:-120px; background:radial-gradient(circle, var(--purple), transparent 70%); animation: drift1 22s ease-in-out infinite; }
+  .orb.o2{ width:460px; height:460px; bottom:-140px; right:-100px; background:radial-gradient(circle, var(--cyan), transparent 70%); animation: drift2 26s ease-in-out infinite; }
+  .orb.o3{ width:340px; height:340px; top:40%; left:60%; background:radial-gradient(circle, var(--purple), transparent 70%); opacity:0.18; animation: drift1 18s ease-in-out infinite reverse; }
+
+  @keyframes drift1{ 0%,100%{ transform:translate3d(0,0,0) } 50%{ transform:translate3d(40px,30px,0) } }
+  @keyframes drift2{ 0%,100%{ transform:translate3d(0,0,0) } 50%{ transform:translate3d(-30px,-40px,0) } }
+
+  @media (prefers-reduced-motion: reduce){
+    .orb, .badge-float.ae, .badge-float.topaz, .chat-fab{ animation:none !important; }
+  }
+  @media (max-width: 640px){
+    .orb{ filter:blur(46px); }
+    .orb.o3{ display:none; }
+  }
+
+  .badge-float{
+    position:absolute;
+    font-family:'JetBrains Mono', monospace;
+    font-weight:800;
+    letter-spacing:0.08em;
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:10px 16px;
+    background:rgba(18,18,28,0.4);
+    backdrop-filter: blur(6px);
+    color:var(--text-dim);
+    user-select:none;
+  }
+  .badge-float.ae{
+    top:14%; right:6%;
+    color:#c7aaff;
+    text-shadow: 0 0 18px rgba(155,92,255,0.55);
+    border-color: rgba(155,92,255,0.3);
+    box-shadow: 0 0 30px rgba(155,92,255,0.12);
+    animation: float 7s ease-in-out infinite;
+  }
+  .badge-float.topaz{
+    bottom:16%; left:5%;
+    color:#9df4e9;
+    text-shadow: 0 0 18px rgba(46,230,214,0.55);
+    border-color: rgba(46,230,214,0.3);
+    box-shadow: 0 0 30px rgba(46,230,214,0.12);
+    animation: float 8s ease-in-out infinite 1s;
+  }
+  .badge-float .gem{
+    display:inline-block; width:9px; height:9px; margin-left:8px;
+    background:var(--cyan); transform:rotate(45deg);
+    box-shadow:0 0 10px var(--cyan);
+  }
+  .badge-float .spark{
+    display:inline-block; width:7px; height:7px; margin-left:8px;
+    background:var(--purple); border-radius:2px;
+    box-shadow:0 0 10px var(--purple);
+  }
+  @keyframes float{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-14px) } }
+
+  @media (max-width: 820px){ .badge-float{ display:none; } }
+
+  /* ---------- Layout ---------- */
+  .wrap{ position:relative; z-index:1; max-width:760px; margin:0 auto; padding:28px 20px 80px; }
+
+  .topbar{
+    display:flex; align-items:center; gap:8px 14px;
+    padding:14px 18px; margin-bottom:34px;
+    border:1px solid var(--border-soft);
+    border-radius:16px;
+    background:rgba(15,15,24,0.55);
+    backdrop-filter: blur(10px);
+  }
+  .brand{ order:1; flex:0 0 auto; display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:0.05em; font-size:16px; }
+  .brand .name{
+    color:#f2ecff;
+    text-shadow:
+      0 0 6px rgba(255,255,255,0.7),
+      0 0 16px rgba(155,92,255,0.9),
+      0 0 34px rgba(155,92,255,0.6),
+      0 0 60px rgba(46,230,214,0.35);
+  }
+  .brand .dot{ width:9px; height:9px; border-radius:50%; background:var(--cyan); box-shadow:0 0 12px var(--cyan); }
+  .visitors-badge{
+    font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--text-dim);
+    display:inline-flex; align-items:center; gap:4px;
+    border:1px solid var(--border-soft); border-radius:8px;
+    padding:2px 7px; margin-left:2px;
+    background:rgba(18,18,28,0.4);
+  }
+  .visitors-badge b{ color:var(--gold); font-weight:700; text-shadow:0 0 8px rgba(255,210,122,0.5); }
+
+  .topbar-center{
+    order:2;
+    flex:1;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px; font-weight:700; letter-spacing:0.14em;
+    text-transform:uppercase; white-space:nowrap;
+    color:#bff6ef;
+    text-shadow:
+      0 0 6px rgba(255,255,255,0.55),
+      0 0 14px rgba(46,230,214,0.8),
+      0 0 30px rgba(46,230,214,0.45);
+  }
+  .topbar-center .tc-dot{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--cyan); box-shadow:0 0 10px var(--cyan);
+    animation:pulse 1.6s infinite;
+  }
+
+  .topbar-right{ order:3; flex:0 0 auto; display:flex; align-items:center; gap:14px; }
+  .lang-switch{ display:flex; align-items:center; gap:6px; }
+  .lang-btn{
+    width:44px; height:32px; border-radius:9px;
+    background:#0e0e17; border:1px solid var(--border);
+    font-family:'JetBrains Mono', monospace;
+    font-size:11.5px; font-weight:800; letter-spacing:0.04em;
+    line-height:1; cursor:pointer;
+    color:#ffffff;
+    display:flex; align-items:center; justify-content:center;
+    opacity:0.45; transition: opacity .2s, border-color .2s, transform .15s, box-shadow .2s, text-shadow .2s;
+  }
+  .lang-btn:hover{ opacity:0.8; transform:translateY(-1px); }
+  .lang-btn.active{
+    opacity:1; border-color: var(--purple-soft);
+    box-shadow: 0 0 14px rgba(155,92,255,0.35);
+    text-shadow:
+      0 0 6px rgba(255,255,255,0.9),
+      0 0 14px rgba(255,255,255,0.7),
+      0 0 28px rgba(155,92,255,0.7),
+      0 0 50px rgba(155,92,255,0.45);
+  }
+  @media (max-width: 640px){
+    .topbar{ flex-wrap:wrap; }
+    .topbar-right{ order:2; margin-left:auto; }
+    .topbar-center{
+      order:3; flex:1 1 100%;
+      font-size:9.5px; letter-spacing:0.1em; gap:6px;
+      margin-top:2px;
+    }
+  }
+  @media (max-width: 420px){
+    .brand{ flex-wrap:wrap; row-gap:6px; }
+  }
+
+  .hero{ text-align:center; margin-bottom:38px; }
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace; font-size:12px; font-weight:700; letter-spacing:0.22em;
+    color:#bff6ef; text-transform:uppercase; margin-bottom:14px;
+    text-shadow:
+      0 0 6px rgba(255,255,255,0.5),
+      0 0 14px rgba(46,230,214,0.85),
+      0 0 30px rgba(46,230,214,0.55),
+      0 0 55px rgba(46,230,214,0.3);
+  }
+  .hero h1{
+    font-size:clamp(28px, 5vw, 42px); line-height:1.15; margin:0 0 12px;
+    font-weight:700;
+  }
+  .hero h1 span{
+    background:linear-gradient(90deg, var(--purple), var(--cyan));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .hero p{ color:var(--text-dim); font-size:15px; max-width:520px; margin:0 auto; }
+
+  /* ---------- Panel ---------- */
+  .panel{
+    background:linear-gradient(180deg, var(--panel), var(--panel-2));
+    border:1px solid var(--border);
+    border-radius:22px;
+    padding:28px;
+    margin-bottom:22px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .panel-head{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:22px;
+  }
+  .panel-head .label{
+    font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:700; letter-spacing:0.16em;
+    color:#a99cff; text-transform:uppercase;
+    text-shadow: 0 0 6px rgba(255,255,255,0.4), 0 0 14px rgba(155,92,255,0.75), 0 0 30px rgba(155,92,255,0.4);
+  }
+  .rec{ display:flex; align-items:center; gap:7px; font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--warn); }
+  .rec .r-dot{ width:7px; height:7px; border-radius:50%; background:var(--warn); box-shadow:0 0 10px var(--warn); animation:pulse 1.6s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Timecode readout */
+  .readout{
+    text-align:center;
+    padding:34px 10px 30px;
+    border-radius:16px;
+    background:radial-gradient(ellipse at center, rgba(155,92,255,0.08), transparent 70%), rgba(6,6,10,0.6);
+    border:1px solid var(--border-soft);
+    margin-bottom:26px;
+    position:relative;
+  }
+  .readout .tag{ font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-faint); letter-spacing:0.14em; margin-bottom:10px; }
+  .price{
+    font-family:'JetBrains Mono', monospace;
+    font-weight:800;
+    font-size:clamp(44px, 11vw, 72px);
+    line-height:1;
+    color:#fff;
+    letter-spacing:0.01em;
+    transition: text-shadow 0.25s ease;
+    text-shadow:
+      0 0 10px rgba(155,92,255,0.9),
+      0 0 26px rgba(155,92,255,0.7),
+      0 0 55px rgba(46,230,214,0.45),
+      0 0 90px rgba(46,230,214,0.25);
+  }
+  .price sup{ font-size:0.4em; margin-left:6px; color:var(--cyan); text-shadow:0 0 16px var(--cyan); }
+  .price.bump{ animation: bump 0.35s ease; }
+  @keyframes bump{ 0%{ transform:scale(1) } 40%{ transform:scale(1.045) } 100%{ transform:scale(1) } }
+
+  .sub-note{ margin-top:10px; font-size:12.5px; color:var(--text-dim); }
+  .sub-note b{ color:var(--gold); }
+
+  /* Timeline control */
+  .field{ margin-bottom:22px; }
+  .field-top{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; }
+  .field-top label{ font-size:13px; color:var(--text-dim); font-weight:500; }
+  .field-top .val{
+    font-family:'JetBrains Mono', monospace; font-weight:700; font-size:14px; color:var(--cyan);
+    text-shadow:0 0 10px rgba(46,230,214,0.5);
+  }
+
+  .timeline{
+    position:relative;
+    height:56px;
+    border-radius:12px;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 10%);
+    background-color:#0a0a12;
+    border:1px solid var(--border);
+    display:flex; align-items:center; padding:0 4px;
+  }
+  .timeline input[type=range]{
+    -webkit-appearance:none; appearance:none;
+    width:100%; height:6px; border-radius:6px;
+    background:linear-gradient(90deg, var(--purple), var(--cyan));
+    outline:none; cursor:pointer;
+  }
+  .timeline input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none;
+    width:20px; height:20px; border-radius:5px;
+    background:#fff;
+    border:3px solid var(--purple);
+    box-shadow:0 0 14px rgba(155,92,255,0.8), 0 0 0 5px rgba(155,92,255,0.15);
+    cursor:grab;
+  }
+  .timeline input[type=range]::-moz-range-thumb{
+    width:20px; height:20px; border-radius:5px;
+    background:#fff; border:3px solid var(--purple);
+    box-shadow:0 0 14px rgba(155,92,255,0.8);
+    cursor:grab;
+  }
+  .timeline input[type=range]:disabled{ opacity:0.4; cursor:not-allowed; }
+  .timeline input[type=range]:disabled::-webkit-slider-thumb{ cursor:not-allowed; }
+
+  .num-input{
+    width:100%;
+    background:#0a0a12;
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:14px 16px;
+    color:var(--text);
+    font-family:'JetBrains Mono', monospace;
+    font-size:15px;
+    outline:none;
+    transition:border-color 0.2s, box-shadow 0.2s;
+  }
+  .num-input:focus{ border-color:var(--purple); box-shadow:0 0 0 3px rgba(155,92,255,0.15); }
+
+  .num-input.error {
+    border-color: var(--warn) !important;
+    box-shadow: 0 0 15px rgba(255,107,107,0.4) !important;
+  }
+  .error-msg {
+    color: var(--warn);
+    font-size: 12px;
+    margin-top: 8px;
+    display: none;
+    font-weight: 600;
+    text-shadow: 0 0 8px rgba(255,107,107,0.4);
+  }
+
+  .hint{ font-size:11.5px; color:var(--text-faint); margin-top:8px; }
+
+  /* ---------- Price comparison chart ---------- */
+  .chart-box{
+    margin-top:16px; padding:16px 16px 8px; background:#0a0a12;
+    border:1px solid var(--border); border-radius:14px;
+  }
+  .chart-box .chart-label{
+    font-size:11px; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--text-faint); margin-bottom:12px; font-weight:600;
+  }
+  .chart-row{
+    display:flex; align-items:center; gap:10px; margin-bottom:9px;
+  }
+  .chart-row .cr-name{
+    width:78px; flex-shrink:0; font-size:11.5px; color:var(--text-dim);
+    font-family:'JetBrains Mono', monospace;
+  }
+  .chart-row .cr-track{
+    flex:1; height:16px; background:#14141f; border-radius:8px; overflow:hidden;
+    border:1px solid var(--border-soft);
+  }
+  .chart-row .cr-fill{
+    height:100%; border-radius:8px;
+    background:linear-gradient(90deg, var(--purple), var(--cyan));
+    opacity:0.45; transition:width .35s ease, opacity .2s ease;
+  }
+  .chart-row.active .cr-fill{ opacity:1; box-shadow:0 0 12px var(--cyan-soft); }
+  .chart-row.active .cr-name{ color:var(--text); font-weight:700; }
+  .chart-row .cr-price{
+    width:56px; flex-shrink:0; text-align:right; font-size:11.5px;
+    font-family:'JetBrains Mono', monospace; color:var(--text-dim);
+  }
+  .chart-row.active .cr-price{ color:#9df4e9; font-weight:700; }
+
+
+  /* ---------- Admin gear + modal ---------- */
+  .admin-gear{
+    background:none; border:none; color:var(--text-faint); opacity:0.35; font-size:14px;
+    cursor:pointer; padding:6px; transition:opacity .15s; vertical-align:middle;
+  }
+  .admin-gear:hover{ opacity:0.9; }
+  .admin-overlay{
+    display:none; position:fixed; inset:0; z-index:100; background:rgba(4,4,8,0.72);
+    backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:20px;
+  }
+  .admin-overlay.open{ display:flex; }
+  .admin-box{
+    width:100%; max-width:480px; max-height:82vh; overflow-y:auto; background:var(--panel);
+    border:1px solid var(--border); border-radius:20px; padding:22px;
+  }
+  .admin-box h3{ margin:0 0 14px; font-size:16px; }
+  .admin-box .a-pass-row{ display:flex; gap:8px; }
+  .admin-box input.a-pass{
+    flex:1; background:#0a0a12; border:1px solid var(--border); border-radius:12px;
+    color:var(--text); padding:11px 14px; font-size:14px; outline:none; letter-spacing:2px;
+  }
+  .admin-box .a-go{
+    background:var(--cyan); color:#06231f; border:none; border-radius:12px; padding:0 18px;
+    font-weight:800; cursor:pointer;
+  }
+  .admin-box .a-err{ color:var(--warn); font-size:12px; margin-top:8px; display:none; }
+  .admin-box .a-err.show{ display:block; }
+  .admin-box .a-tabs{ display:flex; gap:8px; margin-bottom:14px; }
+  .admin-box .a-tab{
+    flex:1; background:#0a0a12; border:1px solid var(--border); color:var(--text-dim);
+    border-radius:10px; padding:9px; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .admin-box .a-tab.active{ background:var(--purple); color:#fff; border-color:transparent; }
+  .admin-box .a-panel{ display:none; }
+  .admin-box .a-panel.active{ display:block; }
+  .admin-box .a-visit-row{
+    display:flex; justify-content:space-between; gap:10px; font-size:12px; padding:9px 0;
+    border-bottom:1px solid var(--border-soft); color:var(--text-dim);
+  }
+  .admin-box .a-visit-row b{ color:var(--text); }
+  .admin-box .a-close{
+    width:100%; margin-top:14px; background:none; border:1px solid var(--border);
+    color:var(--text-dim); border-radius:10px; padding:9px; cursor:pointer;
+  }
+  .admin-box .a-cmt{ background:#0a0a12; border:1px solid var(--border-soft); border-radius:12px; padding:10px; margin-bottom:10px; }
+  .admin-box .a-cmt .a-cmt-meta{ font-size:11px; color:var(--text-faint); margin-bottom:6px; }
+  .admin-box .a-cmt textarea{
+    width:100%; background:#12121c; border:1px solid var(--border); border-radius:8px;
+    color:var(--text); padding:8px; font-size:12.5px; font-family:'Space Grotesk',sans-serif; resize:vertical; min-height:50px;
+  }
+  .admin-box .a-cmt-actions{ display:flex; gap:8px; margin-top:8px; }
+  .admin-box .a-cmt-actions button{
+    flex:1; border:none; border-radius:8px; padding:7px; font-size:11.5px; font-weight:700; cursor:pointer;
+  }
+  .admin-box .a-save-btn{ background:var(--cyan); color:#06231f; }
+  .admin-box .a-del-btn{ background:var(--warn); color:#2a0a0a; }
+
+  /* Quality selector */
+  .quality-grid{
+    display:grid; grid-template-columns:repeat(2, 1fr); gap:10px;
+  }
+  @media (max-width:480px){ .quality-grid{ grid-template-columns:1fr; } }
+  .quality-btn{
+    position:relative;
+    display:flex; flex-direction:column; align-items:flex-start; gap:3px;
+    padding:12px 14px;
+    background:#0a0a12; border:1px solid var(--border); border-radius:12px;
+    cursor:pointer; text-align:left;
+    font-family:'Space Grotesk', sans-serif;
+    color:var(--text); transition: border-color .2s, box-shadow .2s, background .2s;
+  }
+  .quality-btn .q-name{ font-size:13.5px; font-weight:700; }
+  .quality-btn .q-tag{
+    font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:0.06em;
+    color:var(--text-faint); text-transform:uppercase;
+  }
+  .quality-btn:hover{ border-color: var(--purple-soft); }
+  .quality-btn.active{
+    border-color: var(--cyan-soft);
+    background: rgba(46,230,214,0.06);
+    box-shadow: 0 0 0 1px rgba(46,230,214,0.2), 0 0 20px rgba(46,230,214,0.12);
+  }
+  .quality-btn.active .q-name{ color:#9df4e9; text-shadow:0 0 10px rgba(46,230,214,0.5); }
+  .quality-btn.active .q-tag{ color:var(--cyan); }
+  .quality-btn .q-rec{
+    position:absolute; top:-8px; right:10px;
+    font-family:'JetBrains Mono', monospace; font-size:9px; font-weight:800; letter-spacing:0.05em;
+    background:linear-gradient(90deg, var(--purple), var(--cyan)); color:#04101a;
+    padding:2px 7px; border-radius:6px; text-transform:uppercase;
+  }
+  .quality-warn{
+    display:none;
+    margin-top:12px; padding:11px 14px; border-radius:12px;
+    border:1px solid var(--warn-soft); background:rgba(255,107,107,0.06);
+    font-size:12.5px; color:#ffcfcf; line-height:1.5;
+  }
+  .quality-warn.show{ display:block; }
+
+  /* Toggle */
+  .toggle-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 18px;
+    background:#0a0a12;
+    border:1px solid var(--border);
+    border-radius:14px;
+  }
+  .toggle-copy .t1{ font-size:14px; font-weight:600; }
+  .toggle-copy .t2{ font-size:12.5px; color:var(--gold); margin-top:3px; }
+  .switch{ position:relative; width:52px; height:30px; flex:0 0 auto; }
+  .switch input{ opacity:0; width:0; height:0; position:absolute; }
+  .slider-toggle{
+    position:absolute; inset:0; border-radius:30px;
+    background:#26263a; border:1px solid var(--border);
+    cursor:pointer; transition:0.25s;
+  }
+  .slider-toggle:before{
+    content:""; position:absolute; width:22px; height:22px; left:3px; top:3px;
+    border-radius:50%; background:#cfcfe0; transition:0.25s;
+  }
+  .switch input:checked + .slider-toggle{ background:linear-gradient(90deg, var(--purple), var(--cyan)); border-color:transparent; }
+  .switch input:checked + .slider-toggle:before{ transform:translateX(22px); background:#fff; box-shadow:0 0 10px rgba(255,255,255,0.8); }
+
+  /* Link input */
+  .link-input-wrap{ position:relative; }
+  .link-input-wrap .icon{ position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--text-faint); font-size:13px; font-family:'JetBrains Mono', monospace; }
+  .link-input-wrap input{ padding-left:52px; }
+
+  /* ---------- Video checker ---------- */
+  .drop-zone{
+    border:1.5px dashed var(--border);
+    border-radius:16px;
+    padding:26px 18px;
+    text-align:center;
+    background:#0a0a12;
+    cursor:pointer;
+    transition: border-color .2s, background .2s;
+    position:relative;
+  }
+  .drop-zone:hover, .drop-zone.dragover{
+    border-color: var(--purple);
+    background: rgba(155,92,255,0.06);
+  }
+  .drop-zone input[type=file]{ position:absolute; inset:0; opacity:0; cursor:pointer; }
+  .drop-zone .dz-icon{
+    font-family:'JetBrains Mono', monospace; font-size:22px; margin-bottom:8px;
+    color:#c7aaff; text-shadow:0 0 14px rgba(155,92,255,0.6);
+  }
+  .drop-zone .dz-title{ font-size:14px; font-weight:600; margin-bottom:4px; }
+  .drop-zone .dz-sub{ font-size:12px; color:var(--text-faint); }
+
+  .scan-result{
+    display:none;
+    margin-top:16px;
+    padding:16px 18px;
+    border-radius:14px;
+    border:1px solid var(--cyan-soft);
+    background:rgba(46,230,214,0.06);
+  }
+  .scan-result.show{ display:block; }
+  .scan-result .sr-row{
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:13px; padding:4px 0;
+  }
+  .scan-result .sr-row span:first-child{ color:var(--text-dim); }
+  .scan-result .sr-row b{
+    font-family:'JetBrains Mono', monospace; color:var(--cyan);
+    text-shadow:0 0 10px rgba(46,230,214,0.5);
+  }
+  .scan-result .sr-warn{
+    margin-top:8px; font-size:12px; color:var(--gold);
+  }
+  .scan-result .sr-info{
+    margin-top:8px; font-size:12px; color:var(--cyan);
+  }
+  .scan-progress{
+    display:none; align-items:center; gap:10px; margin-top:14px;
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dim);
+  }
+  .scan-progress.show{ display:flex; }
+  .scan-progress .spin{
+    width:14px; height:14px; border-radius:50%;
+    border:2px solid var(--border); border-top-color:var(--purple);
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* ---------- Video compressor ---------- */
+  .comp-intro{ font-size:13px; color:var(--text-dim); margin:-6px 0 16px; line-height:1.55; }
+  .comp-start-btn{
+    width:100%; margin-top:18px;
+    background:linear-gradient(90deg, var(--purple), var(--cyan));
+    color:#04101a; box-shadow:0 10px 30px rgba(155,92,255,0.25);
+  }
+  .comp-start-btn:hover{ box-shadow:0 14px 40px rgba(155,92,255,0.35); }
+  .comp-start-btn:disabled{ opacity:0.45; cursor:not-allowed; transform:none; }
+  .comp-progressbar-wrap{ display:none; margin-top:16px; }
+  .comp-progressbar-wrap.show{ display:block; }
+  .comp-progressbar{
+    width:100%; height:10px; border-radius:6px; background:#12121c;
+    border:1px solid var(--border); overflow:hidden;
+  }
+  .comp-progressbar-fill{
+    height:100%; width:0%; border-radius:6px;
+    background:linear-gradient(90deg, var(--purple), var(--cyan));
+    transition:width .25s ease; box-shadow:0 0 12px var(--purple-soft);
+  }
+  .comp-percent{
+    margin-top:7px; text-align:center; font-family:'JetBrains Mono', monospace;
+    font-size:13px; color:var(--cyan); text-shadow:0 0 10px rgba(46,230,214,0.5);
+  }
+  .comp-download-btn{ margin-top:14px; text-decoration:none; }
+  .comp-reset-btn{
+    width:100%; margin-top:10px; padding:12px; border:1px solid var(--border);
+    border-radius:12px; background:transparent; color:var(--text-dim);
+    font-family:'Space Grotesk', sans-serif; font-weight:600; font-size:13px;
+    cursor:pointer; transition:border-color .2s, color .2s;
+  }
+  .comp-reset-btn:hover{ border-color:var(--purple); color:#fff; }
+  .comp-note{ margin-top:16px; }
+  .comp-error{ display:none; }
+
+  /* ---------- Order buttons (multi-channel) ---------- */
+  .order-grid{ display:flex; flex-direction:column; gap:12px; }
+  .order-btn{
+    width:100%;
+    padding:17px;
+    border:none; border-radius:14px;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700; font-size:15.5px;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity .15s ease;
+  }
+  .order-btn:hover{ transform:translateY(-2px); }
+  .order-btn:active{ transform:translateY(0); }
+  .order-btn:disabled{ opacity:0.45; cursor:not-allowed; transform:none; }
+  .order-btn .ico{ font-size:18px; line-height:1; }
+
+  .order-btn.wa{
+    background:linear-gradient(90deg, #25D366, #1fb055);
+    color:#062b12;
+    box-shadow:0 10px 30px rgba(37,211,102,0.25);
+  }
+  .order-btn.wa:hover{ box-shadow:0 14px 40px rgba(37,211,102,0.35); }
+
+  .order-btn.tg{
+    background:linear-gradient(90deg, #2ea6ff, #1e7fd6);
+    color:#04182b;
+    box-shadow:0 10px 30px rgba(46,166,255,0.25);
+  }
+  .order-btn.tg:hover{ box-shadow:0 14px 40px rgba(46,166,255,0.35); }
+
+  .copy-note{
+    text-align:center; font-size:11.5px; color:var(--text-faint); margin-top:4px;
+    font-family:'JetBrains Mono', monospace;
+    min-height:14px;
+  }
+  .copy-note.active{ color:var(--cyan); text-shadow:0 0 8px rgba(46,230,214,0.5); }
+
+  /* Warning */
+  .warn-panel{
+    border:1px solid var(--warn-soft);
+    background:linear-gradient(180deg, rgba(255,107,107,0.06), rgba(255,107,107,0.02));
+    border-radius:18px;
+    padding:22px 22px;
+  }
+  .warn-panel .w-head{
+    display:flex; align-items:center; gap:10px; margin-bottom:12px;
+  }
+  .warn-panel .w-head .ico{
+    width:26px; height:26px; border-radius:50%;
+    background:rgba(255,107,107,0.15); border:1px solid var(--warn-soft);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono', monospace; font-weight:800; color:var(--warn);
+    font-size:14px;
+    text-shadow:0 0 10px var(--warn);
+  }
+  .warn-panel .w-head span.title{
+    font-weight:700; font-size:14.5px;
+    color:#ffb3b3;
+    text-shadow:0 0 12px rgba(255,107,107,0.7), 0 0 30px rgba(255,107,107,0.35);
+    letter-spacing:0.01em;
+  }
+  .warn-panel p{
+    margin:0 0 8px; font-size:13.5px; line-height:1.65; color:#e8c9c9;
+  }
+  .warn-panel b{
+    color:#fff;
+    text-shadow:0 0 10px rgba(255,107,107,0.8), 0 0 22px rgba(255,107,107,0.4);
+    font-weight:700;
+  }
+  .warn-panel .spec{
+    font-family:'JetBrains Mono', monospace; font-size:12.5px;
+    color:var(--cyan); text-shadow:0 0 10px rgba(46,230,214,0.5);
+  }
+
+  /* Tutorial */
+  .tutorial-panel{ padding:22px 24px; }
+  .tutorial-panel .panel-head{
+    margin-bottom:0; cursor:pointer; user-select:none;
+  }
+  .tutorial-toggle-btn{
+    display:flex; align-items:center; gap:6px;
+    background:rgba(155,92,255,0.12); border:1px solid var(--purple-soft);
+    color:#c9b8ff; font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:700;
+    letter-spacing:0.04em; border-radius:10px; padding:7px 12px; cursor:pointer;
+    transition:all .2s ease;
+  }
+  .tutorial-toggle-btn:hover{ border-color:var(--purple); color:#fff; box-shadow:0 0 14px rgba(155,92,255,0.35); }
+  .tutorial-toggle-btn .chev{ display:inline-block; transition:transform .25s ease; }
+  .tutorial-panel.open .tutorial-toggle-btn .chev{ transform:rotate(180deg); }
+  .tutorial-body{
+    max-height:0; overflow:hidden; opacity:0;
+    transition:max-height .35s ease, opacity .3s ease, margin-top .3s ease;
+  }
+  .tutorial-panel.open .tutorial-body{
+    max-height:900px; opacity:1; margin-top:20px;
+  }
+  .tutorial-steps{
+    list-style:none; margin:0; padding:0;
+    display:flex; flex-direction:column; gap:14px;
+  }
+  .tutorial-steps li{
+    display:flex; align-items:flex-start; gap:14px;
+    font-size:13.5px; line-height:1.65; color:#cfd3e6;
+  }
+  .tutorial-steps .t-num{
+    flex:none; width:26px; height:26px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(135deg, var(--purple), var(--cyan));
+    color:#0a0a14; font-family:'JetBrains Mono', monospace; font-weight:800; font-size:12.5px;
+    box-shadow:0 0 12px rgba(155,92,255,0.45);
+  }
+  .tutorial-steps li a{
+    color:var(--cyan); text-decoration:underline; text-underline-offset:2px;
+  }
+  .tutorial-steps li a:hover{ text-shadow:0 0 10px rgba(46,230,214,0.6); }
+  .tutorial-steps li b{ color:#fff; }
+
+  footer{
+    text-align:center; margin-top:34px; color:var(--text-faint); font-size:12px;
+    font-family:'JetBrains Mono', monospace;
+  }
+
+  /* ---------- AI Chat Widget ---------- */
+  .chat-fab{
+    position:fixed; right:20px; bottom:20px; z-index:50;
+    width:60px; height:60px; border-radius:50%;
+    background:linear-gradient(135deg, var(--purple), var(--cyan));
+    border:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 10px 30px rgba(155,92,255,0.45), 0 0 0 1px rgba(255,255,255,0.08) inset;
+    font-size:24px;
+    animation: fabPulse 3s ease-in-out infinite;
+  }
+  @keyframes fabPulse{ 0%,100%{ box-shadow:0 10px 30px rgba(155,92,255,0.45);} 50%{ box-shadow:0 10px 44px rgba(46,230,214,0.55);} }
+  .chat-fab .badge-dot{
+    position:absolute; top:-2px; right:-2px; width:14px; height:14px; border-radius:50%;
+    background:var(--warn); border:2px solid var(--bg); box-shadow:0 0 8px var(--warn);
+  }
+
+  .chat-panel{
+    position:fixed; right:20px; bottom:92px; z-index:50;
+    width:min(360px, calc(100vw - 32px));
+    height:min(520px, calc(100vh - 140px));
+    background:linear-gradient(180deg, var(--panel), var(--panel-2));
+    border:1px solid var(--border);
+    border-radius:20px;
+    box-shadow:0 30px 80px rgba(0,0,0,0.55);
+    display:none;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  .chat-panel.open{ display:flex; }
+
+  .chat-head{
+    padding:16px 18px;
+    border-bottom:1px solid var(--border-soft);
+    display:flex; align-items:center; justify-content:space-between;
+    background:rgba(155,92,255,0.06);
+  }
+  .chat-head .ch-l{ display:flex; align-items:center; gap:10px; }
+  .chat-head .avatar{
+    width:34px; height:34px; border-radius:10px;
+    background:linear-gradient(135deg, var(--purple), var(--cyan));
+    display:flex; align-items:center; justify-content:center; font-size:16px;
+  }
+  .chat-head .ch-name{ font-size:13.5px; font-weight:700; }
+  .chat-head .ch-status{ font-size:11px; color:var(--cyan); display:flex; align-items:center; gap:5px; }
+  .chat-head .ch-status .d{ width:6px; height:6px; border-radius:50%; background:var(--cyan); box-shadow:0 0 8px var(--cyan); }
+  .chat-close{ background:none; border:none; color:var(--text-faint); font-size:18px; cursor:pointer; padding:4px 8px; }
+  .chat-close:hover{ color:var(--text); }
+
+  .chat-body{
+    flex:1; overflow-y:auto; padding:16px;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .msg{
+    max-width:82%; padding:10px 13px; border-radius:14px; font-size:13px; line-height:1.5;
+  }
+  .msg.bot{
+    align-self:flex-start;
+    background:#0a0a12; border:1px solid var(--border-soft);
+    border-bottom-left-radius:4px;
+  }
+  .msg.user{
+    align-self:flex-end;
+    background:linear-gradient(90deg, var(--purple), #7a4ae0);
+    color:#fff;
+    border-bottom-right-radius:4px;
+  }
+  .quick-replies{ display:flex; flex-wrap:wrap; gap:6px; margin-top:2px; }
+  .qr-btn{
+    font-family:'Space Grotesk', sans-serif; font-size:11.5px;
+    background:#12121c; border:1px solid var(--border); color:var(--text-dim);
+    padding:7px 11px; border-radius:20px; cursor:pointer; transition:.15s;
+  }
+  .qr-btn:hover{ border-color:var(--purple); color:#fff; background:rgba(155,92,255,0.1); }
+
+  .chat-input-row{
+    display:flex; gap:8px; padding:12px; border-top:1px solid var(--border-soft);
+  }
+  .chat-input-row input{
+    flex:1; background:#0a0a12; border:1px solid var(--border); border-radius:12px;
+    padding:11px 13px; color:var(--text); font-family:'Space Grotesk', sans-serif; font-size:13px; outline:none;
+  }
+  .chat-input-row input:focus{ border-color:var(--purple); }
+  .chat-send{
+    width:40px; height:40px; border-radius:12px; border:none; flex:0 0 auto;
+    background:linear-gradient(135deg, var(--purple), var(--cyan)); color:#fff;
+    cursor:pointer; font-size:15px; display:flex; align-items:center; justify-content:center;
+  }
+
+  /* Mobile Responsive adjustments */
+  @media (max-width: 600px){
+    .wrap{ padding:16px 12px 60px; }
+    .panel{ padding:20px 16px; }
+    .hero h1{ font-size: 28px; }
+    .price{ font-size: 50px; }
+    .chat-panel{ bottom:84px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-layer">
+  <div class="ruler"></div>
+  <div class="grain"></div>
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+  <div class="badge-float ae">AFTER&nbsp;EFFECTS&nbsp;GRADE<span class="spark"></span></div>
+  <div class="badge-float topaz">TOPAZ&nbsp;AI&nbsp;ENHANCED<span class="gem"></span></div>
+</div>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span> <span class="name">MOON</span> <span class="visitors-badge" id="visitorBadge">👁 <b>···</b></span></div>
+    <div class="topbar-center"><span class="tc-dot"></span> <span data-i18n="topbarTagline">REAL-TIME PRICE ENGINE</span></div>
+    <div class="topbar-right">
+      <div class="lang-switch" id="langSwitch">
+        <button class="lang-btn active" id="langKa" data-lang="ka" aria-label="ქართული">GEO</button>
+        <button class="lang-btn" id="langEn" data-lang="en" aria-label="English">ENG</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="eyebrow">VIDEO EDITING · PRICE ENGINE</div>
+    <h1 data-i18n="heroTitle">გამოთვალე შენი <span>მონტაჟის ღირებულება</span> ზუსტად კადრამდე</h1>
+    <p data-i18n="heroSub">მიუთითე ვიდეოს ხანგრძლივობა (ან ატვირთე ვიდეო და ავტომატურად გაზომავს) — ფასი გამოითვლება რეალურ დროში, After Effects & Topaz ხარისხის მონტაჟისთვის.</p>
+  </div>
+
+  <div class="panel tutorial-panel" id="tutorialPanel">
+    <div class="panel-head" id="tutorialToggleHead">
+      <div class="label" data-i18n="tutorialLabel">როგორ გავაკეთო შეკვეთა?</div>
+      <button type="button" class="tutorial-toggle-btn" id="tutorialToggleBtn">
+        <span data-i18n="tutorialToggleText">ვრცლად</span> <span class="chev">▾</span>
+      </button>
+    </div>
+    <div class="tutorial-body" id="tutorialBody">
+      <ol class="tutorial-steps">
+        <li><span class="t-num">1</span><span data-i18n="tutorialStep1">აირჩიეთ სასურველი ვიდეოს <b>ფორმატი / ხარისხი</b> (რეზოლუცია და fps) კალკულატორში.</span></li>
+        <li><span class="t-num">2</span><span data-i18n="tutorialStep2">თუ <b>ზუსტად არ იცით</b> ვიდეოს ხანგრძლივობა — ატვირთეთ ვიდეო <b>VIDEO SCANNER</b>-ში და ხანგრძლივობა ავტომატურად გაიზომება და ჩაისმება კალკულატორში.</span></li>
+        <li><span class="t-num">3</span><span data-i18n="tutorialStep3">თუ ხანგრძლივობა <b>ზუსტად იცით</b> — ხელით მონიშნეთ შესაბამის ველში: „მონიშნე ზუსტი დრო (წამი)" და „წამის მეასედი / კადრი (Milliseconds)".</span></li>
+        <li><span class="t-num">4</span><span data-i18n="tutorialStep4">ეკრანზე დაუყოვნებლივ ნახავთ ვიდეოს მონტაჟის <b>საბოლოო ღირებულებას</b> რეალურ დროში.</span></li>
+        <li><span class="t-num">5</span><span data-i18n="tutorialStep5">სურვილის შემთხვევაში, დააჭირეთ <b>„გაგზავნე შეკვეთა"</b> და გამომიგზავნეთ შეკვეთა <b>WhatsApp</b>-ზე ან <b>Telegram</b>-ზე.</span></li>
+        <li><span class="t-num">6</span><span data-i18n="tutorialStep6">ვიდეოს გამოსაგზავნად ატვირთეთ ის <a href="https://wetransfer.com/" target="_blank" rel="noopener">wetransfer.com</a>-ზე, შემდეგ კი მიღებული ლინკი გამომიგზავნეთ <b>Telegram</b>-ზე ან <b>WhatsApp</b>-ზე.</span></li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div class="label" data-i18n="priceReadout">PRICE READOUT</div>
+      <div class="rec"><span class="r-dot"></span> LIVE</div>
+    </div>
+
+    <div class="readout">
+      <div class="tag" data-i18n="finalPrice">საბოლოო ღირებულება</div>
+      <div class="price" id="priceDisplay">1.50<sup>₾</sup></div>
+      <div class="sub-note" id="subNote" data-i18n="notSubscribed">არ ხართ გამომწერი — <b>გახდი გამომწერი და დაზოგე თანხა!</b></div>
+    </div>
+
+    <div class="field">
+      <div class="field-top">
+        <label data-i18n="markDuration">მონიშნე ზუსტი დრო (წამი)</label>
+        <span class="val" id="secVal">5</span>
+      </div>
+      <div class="timeline">
+        <input type="range" id="secondsRange" min="5" max="59" step="1" value="5">
+      </div>
+      <input type="number" class="num-input" id="secondsInput" min="0" max="59" value="5" placeholder="შეიყვანე წამი (0–59)" data-i18n-placeholder="secondsPlaceholder" style="margin-top:10px;">
+    </div>
+
+    <div class="field">
+      <div class="field-top">
+        <label data-i18n="msLabel">წამის მეასედი / კადრი (Milliseconds)</label>
+        <span class="val" id="msVal">00</span>
+      </div>
+      <div class="timeline">
+        <input type="range" id="msRange" min="0" max="59" step="1" value="0">
+      </div>
+      <div class="hint" data-i18n="msHint">მაქსიმალური სრული ხანგრძლივობა — 59:59. ამის ფარგლებში ფასი ერთნაირად ითვლება 59-ე წამის ტარიფით.</div>
+    </div>
+
+    <div class="field">
+      <div class="field-top"><label data-i18n="qualityLabel">ვიდეოს ხარისხი (რეზოლუცია / fps)</label></div>
+      <div class="quality-grid" id="qualityGrid">
+        <button type="button" class="quality-btn active" data-quality="1080_60">
+          <span class="q-rec" data-i18n="qualityRecBadge">რეკომენდირებული</span>
+          <span class="q-name">1080p</span>
+          <span class="q-tag">60 FPS</span>
+        </button>
+        <button type="button" class="quality-btn" data-quality="1080_120">
+          <span class="q-name">1080p</span>
+          <span class="q-tag">120 FPS</span>
+        </button>
+        <button type="button" class="quality-btn" data-quality="2k_60">
+          <span class="q-name">2K</span>
+          <span class="q-tag">60 FPS</span>
+        </button>
+        <button type="button" class="quality-btn" data-quality="2k_120">
+          <span class="q-name">2K</span>
+          <span class="q-tag">120 FPS</span>
+        </button>
+        <button type="button" class="quality-btn" data-quality="4k_60">
+          <span class="q-name">4K</span>
+          <span class="q-tag">60 FPS</span>
+        </button>
+        <button type="button" class="quality-btn" data-quality="4k_120">
+          <span class="q-name">4K</span>
+          <span class="q-tag">120 FPS</span>
+        </button>
+      </div>
+      <div class="quality-warn" id="qualityWarn" data-i18n="qualityWarnText">⚠️ გირჩევთ 1080p/60fps ფორმატს — უფრო მაღალი ხარისხის ფორმატებზე შესაძლოა მაყურებელს ვიდეო გაუჭედოს.</div>
+
+      <div class="chart-box">
+        <div class="chart-label" data-i18n="chartLabel">ფასის შედარება ამჟამინდელი ხანგრძლივობით</div>
+        <div id="priceChart"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="toggle-row">
+        <div class="toggle-copy">
+          <div class="t1" data-i18n="subscriberT1">ვარ არხის გამომწერი</div>
+          <div class="t2" data-i18n="subscriberT2">✓ დაბალი ტარიფი აქტიურდება</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="subToggle">
+          <span class="slider-toggle"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:6px;">
+      <div class="field-top"><label data-i18n="tiktokLabel">თქვენი TikTok პროფილის ლინკი *</label></div>
+      <div class="link-input-wrap">
+        <span class="icon">@</span>
+        <input type="text" class="num-input" id="tiktokLink" placeholder="tiktok.com/@username">
+      </div>
+      <div class="error-msg" id="tiktokError" data-i18n="tiktokError">⚠️ შეკვეთის გასაგზავნად TikTok პროფილის ლინკის მითითება აუცილებელია!</div>
+    </div>
+  </div>
+
+  <!-- Video duration checker -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="label" data-i18n="videoScanner">VIDEO SCANNER</div>
+    </div>
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="videoInput" accept="video/*">
+      <div class="dz-icon">▶</div>
+      <div class="dz-title" data-i18n="dzTitle">ატვირთე ვიდეო ავტომატური გაზომვისთვის</div>
+      <div class="dz-sub" data-i18n="dzSub">გადმოიტანე ან დააკლიკე — ხანგრძლივობა ავტომატურად ჩაისმება კალკულატორში</div>
+    </div>
+    <div class="scan-progress" id="scanProgress"><span class="spin"></span> <span data-i18n="scanProcessing">ვიდეო მუშავდება…</span></div>
+    <div class="scan-result" id="scanResult">
+      <div class="sr-row"><span data-i18n="srFile">ფაილი</span><b id="srName">—</b></div>
+      <div class="sr-row"><span data-i18n="srDuration">ხანგრძლივობა</span><b id="srDuration">—</b></div>
+      <div class="sr-row"><span data-i18n="srRequestedFormat">მოთხოვნილი ხარისხი</span><b id="srRequested">—</b></div>
+      <div class="sr-row" id="srQualityRow" style="display:none;"><span data-i18n="srDetectedFormat">ატვირთული ვიდეოს ფორმატი</span><b id="srQuality">—</b></div>
+      <div class="sr-row"><span data-i18n="srPrice">გამოთვლილი ფასი</span><b id="srPrice">—</b></div>
+      <div class="sr-info" id="srMatchNote" style="display:none;"></div>
+      <div class="sr-warn" id="srMismatchNote" style="display:none;"></div>
+      <div class="sr-warn" id="srWarn" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Video compressor (client-side, ffmpeg.wasm / WebAssembly — no upload to any server) -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="label" data-i18n="compressorLabel">VIDEO COMPRESSOR</div>
+    </div>
+    <p class="comp-intro" data-i18n="compIntro">ატვირთე მძიმე ვიდეო ფაილი და შეკუმშე სასურველ ზომამდე — დამუშავება 100% ხდება შენს ბრაუზერში (WebAssembly), ფაილი არსად იგზავნება და არავინ ხედავს მას.</p>
+
+    <div class="drop-zone" id="compDropZone">
+      <input type="file" id="compVideoInput" accept="video/*">
+      <div class="dz-icon">🗜</div>
+      <div class="dz-title" data-i18n="compDzTitle">ჩააგდე ან აირჩიე ვიდეო შესაკუმშად</div>
+      <div class="dz-sub" data-i18n="compDzSub">რეკომენდებულია 1.5GB-მდე ფაილები — ყველა დამუშავება ხდება ლოკალურად</div>
+    </div>
+
+    <div class="scan-result" id="compFileInfo">
+      <div class="sr-row"><span data-i18n="srFile">ფაილი</span><b id="compFileName">—</b></div>
+      <div class="sr-row"><span data-i18n="srDuration">ხანგრძლივობა</span><b id="compFileDuration">—</b></div>
+      <div class="sr-row"><span data-i18n="compOrigSize">ორიგინალი ზომა</span><b id="compFileSize">—</b></div>
+    </div>
+
+    <div class="field" id="compTargetField" style="display:none;">
+      <div class="field-top">
+        <label data-i18n="compTargetLabel">სასურველი საბოლოო ზომა (MB)</label>
+        <span class="val" id="compTargetVal">30</span>
+      </div>
+      <div class="timeline">
+        <input type="range" id="compTargetRange" min="5" max="500" step="1" value="30">
+      </div>
+      <input type="number" class="num-input" id="compTargetInput" min="5" max="2000" value="30" style="margin-top:10px;">
+      <div class="hint" id="compBitrateHint"></div>
+    </div>
+
+    <button type="button" class="order-btn comp-start-btn" id="compStartBtn" style="display:none;">
+      <span class="ico">🗜</span> <span data-i18n="compStartBtnText">შეკუმშვის დაწყება</span>
+    </button>
+
+    <div class="scan-progress" id="compProgress">
+      <span class="spin"></span> <span id="compProgressLabel" data-i18n="compLoadingModule">იტვირთება შეკუმშვის მოდული…</span>
+    </div>
+    <div class="comp-progressbar-wrap" id="compProgressBarWrap">
+      <div class="comp-progressbar"><div class="comp-progressbar-fill" id="compProgressFill"></div></div>
+      <div class="comp-percent" id="compProgressPercent">0%</div>
+    </div>
+
+    <div class="scan-result" id="compResult">
+      <div class="sr-row"><span data-i18n="compOrigSize">ორიგინალი ზომა</span><b id="compResOrig">—</b></div>
+      <div class="sr-row"><span data-i18n="compFinalSize">საბოლოო ზომა</span><b id="compResFinal">—</b></div>
+      <div class="sr-row"><span data-i18n="compReduction">შემცირდა</span><b id="compResReduction">—</b></div>
+      <a class="order-btn wa comp-download-btn" id="compDownloadBtn" download="compressed.mp4"><span class="ico">⬇</span> <span data-i18n="compDownloadBtnText">გადმოწერე შეკუმშული ვიდეო</span></a>
+      <button type="button" class="comp-reset-btn" id="compResetBtn" data-i18n="compResetBtnText">კიდევ ერთის შეკუმშვა</button>
+    </div>
+
+    <div class="sr-warn comp-error" id="compError" style="display:none;"></div>
+    <div class="hint comp-note" data-i18n="compNote">⚠️ შეკუმშვა ხდება პირდაპირ შენს ბრაუზერში (WebAssembly-ით), სერვერზე არაფერი იტვირთება. ძალიან დიდი ან გრძელი ფაილების დამუშავებას შეიძლება რამდენიმე წუთი დასჭირდეს — გთხოვთ არ დახუროთ ტაბი პროცესის დასრულებამდე. მნიშვნელოვანია გვახსოვდეს: 100%-ით უხარისხოდ შეკუმშვა ფიზიკურად შეუძლებელია — რაც უფრო მცირე საბოლოო ზომას ირჩევთ, მით მეტი ხარისხი იკარგება მოცემულობის კანონის მიხედვით.</div>
+  </div>
+
+  <!-- Order channels -->
+  <div class="panel" style="padding:22px;">
+    <div class="panel-head" style="margin-bottom:16px;">
+      <div class="label" data-i18n="sendOrder">გაგზავნე შეკვეთა</div>
+    </div>
+    <div class="order-grid">
+      <button class="order-btn wa" id="orderBtnWA"><span class="ico">✆</span> <span data-i18n="sendWA">WhatsApp-ზე გაგზავნა</span></button>
+      <button class="order-btn tg" id="orderBtnTG"><span class="ico">✈</span> <span data-i18n="sendTG">Telegram-ზე გაგზავნა</span></button>
+    </div>
+    <div class="copy-note" id="copyNote"></div>
+  </div>
+
+  <div class="warn-panel">
+    <div class="w-head">
+      <div class="ico">!</div>
+      <span class="title" data-i18n="warnTitle">გაფრთხილება შეკვეთამდე</span>
+    </div>
+    <p data-i18n="warnP1">ვიდეო მონტაჟდება <b>მხოლოდ TikTok-ისთვის</b>, უდანაკლო ხარისხით.</p>
+    <p data-i18n="warnP2">გთხოვთ, დარწმუნებული იყავით, რომ თქვენი ვიდეოს ხანგრძლივობა <b>არ აღემატება 59:59 წამს</b> — ამაზე მეტი ხანგრძლივობა ინდივიდუალურად ფასდება და კალკულატორში არ შედის.</p>
+    <p data-i18n="warnP3">ასევე დარწმუნდით, რომ მასალა გადაღებული და დარენდერებულია <b>1080p / 60fps</b> ხარისხში — ეს გავლენას ახდენს საბოლოო შედეგის სისუფთავეზე.</p>
+    <p data-i18n="warnP4">კალკულატორში ხელმისაწვდომია <b>1080p/120fps, 2K/60fps, 2K/120fps, 4K/60fps და 4K/120fps</b> ვარიანტებიც, თუმცა ამ ფორმატებს არ გირჩევთ — შესაძლოა მაყურებლებს ვიდეო თავისით გაუჭედოთ ან შენელდეთ.</p>
+    <p class="spec">REC.SPEC → 1080×1920 · 60fps · MAX 59.59s</p>
+  </div>
+
+  <footer><span data-i18n="footer">FRAME.RATE — ზუსტი კალკულაცია, კადრამდე სიზუსტით</span> <button class="admin-gear" id="adminGear" aria-label="admin" title="admin">⚙</button></footer>
+
+</div>
+
+<!-- ---------- Admin panel ---------- -->
+<div class="admin-overlay" id="adminOverlay">
+  <div class="admin-box" id="adminBox">
+    <div id="adminLogin">
+      <h3 data-i18n="adminTitle">ადმინის პანელი</h3>
+      <div class="a-pass-row">
+        <input type="password" class="a-pass" id="adminPass" inputmode="numeric" maxlength="10" data-i18n-placeholder="adminPassPh" placeholder="პაროლი">
+        <button class="a-go" id="adminGo" data-i18n="adminEnter">შესვლა</button>
+      </div>
+      <div class="a-err" id="adminErr" data-i18n="adminWrongPass">არასწორი პაროლი</div>
+      <button class="a-close" id="adminCloseLogin" data-i18n="adminClose">დახურვა</button>
+    </div>
+    <div id="adminDashboard" style="display:none;">
+      <h3 data-i18n="adminTitle">ადმინის პანელი</h3>
+      <div class="a-panel active" id="adminPanelVisits"></div>
+      <button class="a-close" id="adminCloseDash" data-i18n="adminClose">დახურვა</button>
+    </div>
+  </div>
+</div>
+
+<!-- ---------- AI Chat Widget ---------- -->
+<button class="chat-fab" id="chatFab" aria-label="დახმარების ასისტენტი">💬<span class="badge-dot"></span></button>
+
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-head">
+    <div class="ch-l">
+      <div class="avatar">🌙</div>
+      <div>
+        <div class="ch-name">MOON <span data-i18n="chatAssistant">ასისტენტი</span></div>
+        <div class="ch-status"><span class="d"></span> <span data-i18n="chatOnline">ონლაინ</span></div>
+      </div>
+    </div>
+    <button class="chat-close" id="chatClose">✕</button>
+  </div>
+  <div class="chat-body" id="chatBody"></div>
+  <div class="chat-input-row">
+    <input type="text" id="chatInput" placeholder="დასვი კითხვა…" data-i18n-placeholder="chatInputPlaceholder">
+    <button class="chat-send" id="chatSend">➤</button>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // 0) LANGUAGE / i18n SYSTEM
+  // ============================================================
+  const TRANSLATIONS = {
+    ka: {
+      visitorsLabel: 'სულ ვიზიტორი საიტზე:',
+      topbarTagline: 'ფასი რეალურ დროში · AI მონტაჟი',
+      heroTitle: 'გამოთვალე შენი <span>მონტაჟის ღირებულება</span> ზუსტად კადრამდე',
+      heroSub: 'მიუთითე ვიდეოს ხანგრძლივობა (ან ატვირთე ვიდეო და ავტომატურად გაზომავს) — ფასი გამოითვლება რეალურ დროში, After Effects & Topaz ხარისხის მონტაჟისთვის.',
+      priceReadout: 'PRICE READOUT',
+      finalPrice: 'საბოლოო ღირებულება',
+      subActive: '✓ გამომწერის ტარიფი აქტიურია — <b>თანხა უკვე დაზოგილია!</b>',
+      notSubscribed: 'არ ხართ გამომწერი — <b>გახდი გამომწერი და დაზოგე თანხა!</b>',
+      markDuration: 'მონიშნე ზუსტი დრო (წამი)',
+      secondsPlaceholder: 'შეიყვანე წამი (0–59)',
+      msLabel: 'წამის მეასედი / კადრი (Milliseconds)',
+      msHint: 'მაქსიმალური სრული ხანგრძლივობა — 59:59. ამის ფარგლებში ფასი ერთნაირად ითვლება 59-ე წამის ტარიფით.',
+      qualityLabel: 'ვიდეოს ხარისხი (რეზოლუცია / fps)',
+      qualityRecBadge: 'რეკომენდირებული',
+      qualityWarnText: '⚠️ გირჩევთ 1080p/60fps ფორმატს — უფრო მაღალი ხარისხის ფორმატებზე შესაძლოა მაყურებელს ვიდეო გაუჭედოს.',
+      subscriberT1: 'ვარ არხის გამომწერი',
+      subscriberT2: '✓ დაბალი ტარიფი აქტიურდება',
+      tiktokLabel: 'თქვენი TikTok პროფილის ლინკი *',
+      tiktokError: '⚠️ შეკვეთის გასაგზავნად TikTok პროფილის ლინკის მითითება აუცილებელია!',
+      videoScanner: 'VIDEO SCANNER',
+      dzTitle: 'ატვირთე ვიდეო ავტომატური გაზომვისთვის',
+      dzSub: 'გადმოიტანე ან დააკლიკე — ხანგრძლივობა ავტომატურად ჩაისმება კალკულატორში',
+      scanProcessing: 'ვიდეო მუშავდება…',
+      srFile: 'ფაილი',
+      srDuration: 'ხანგრძლივობა',
+      srDetectedFormat: 'ატვირთული ვიდეოს ფორმატი',
+      srRequestedFormat: 'მოთხოვნილი ხარისხი',
+      srPrice: 'გამოთვლილი ფასი',
+      srUnit: 'წმ',
+      srFpsUnknown: 'fps უცნობია',
+      srMatchNote: '✓ ატვირთული ვიდეო შეესაბამება მოთხოვნილ ხარისხს ({REQ})',
+      srMismatchNote: '⚠️ მოთხოვნილია {REQ}, თუმცა ატვირთული ვიდეო რეალურად არის {DET} ხარისხის — ფასი მაინც გამოთვლილია თქვენ მიერ მოთხოვნილი ({REQ}) ხარისხის მიხედვით.',
+      srWarnOver: '⚠️ ვიდეო აღემატება 59.59 წამს — ფასდება ინდივიდუალურად, კალკულატორმა აჩვენა 59.59-ის ტარიფი.',
+      alertNotVideo: 'გთხოვთ ატვირთოთ ვიდეო ფაილი (mp4, mov, webm და სხვ.)',
+      alertReadError: 'ვერ მოხერხდა ვიდეოს წაკითხვა — სცადეთ სხვა ფაილი.',
+      sendOrder: 'გაგზავნე შეკვეთა',
+      sendWA: 'WhatsApp-ზე გაგზავნა',
+      sendTG: 'Telegram-ზე გაგზავნა',
+      tgSentNote: '✓ იხსნება MOON-ის Telegram ჩატი (@MOON_TG) — ტექსტიც დაკოპირებულია დარეზერვებით',
+      warnTitle: 'გაფრთხილება შეკვეთამდე',
+      warnP1: 'ვიდეო მონტაჟდება <b>მხოლოდ TikTok-ისთვის</b>, უდანაკლო ხარისხით.',
+      warnP2: 'გთხოვთ, დარწმუნებული იყავით, რომ თქვენი ვიდეოს ხანგრძლივობა <b>არ აღემატება 59:59 წამს</b> — ამაზე მეტი ხანგრძლივობა ინდივიდუალურად ფასდება და კალკულატორში არ შედის.',
+      warnP3: 'ასევე დარწმუნდით, რომ მასალა გადაღებული და დარენდერებულია <b>1080p / 60fps</b> ხარისხში — ეს გავლენას ახდენს საბოლოო შედეგის სისუფთავეზე.',
+      warnP4: 'კალკულატორში ხელმისაწვდომია <b>1080p/120fps, 2K/60fps, 2K/120fps, 4K/60fps და 4K/120fps</b> ვარიანტებიც, თუმცა ამ ფორმატებს არ გირჩევთ — შესაძლოა მაყურებლებს ვიდეო თავისით გაუჭედოთ ან შენელდეთ.',
+      footer: 'FRAME.RATE — ზუსტი კალკულაცია, კადრამდე სიზუსტით',
+      chatAssistant: 'ასისტენტი',
+      chatOnline: 'ონლაინ',
+      chatInputPlaceholder: 'დასვი კითხვა…',
+      chartLabel: 'ფასის შედარება ამჟამინდელი ხანგრძლივობით',
+      adminTitle: 'ადმინის პანელი',
+      adminPassPh: 'პაროლი',
+      adminEnter: 'შესვლა',
+      adminWrongPass: 'არასწორი პაროლი',
+      adminClose: 'დახურვა',
+      adminTabVisits: 'ვიზიტორები',
+      adminNoVisits: 'ვიზიტები ჯერ არ დაფიქსირებულა.',
+      tutorialLabel: 'როგორ გავაკეთო შეკვეთა?',
+      tutorialToggleText: 'ვრცლად',
+      tutorialStep1: 'აირჩიეთ სასურველი ვიდეოს <b>ფორმატი / ხარისხი</b> (რეზოლუცია და fps) კალკულატორში.',
+      tutorialStep2: 'თუ <b>ზუსტად არ იცით</b> ვიდეოს ხანგრძლივობა — ატვირთეთ ვიდეო <b>VIDEO SCANNER</b>-ში და ხანგრძლივობა ავტომატურად გაიზომება და ჩაისმება კალკულატორში.',
+      tutorialStep3: 'თუ ხანგრძლივობა <b>ზუსტად იცით</b> — ხელით მონიშნეთ შესაბამის ველში: „მონიშნე ზუსტი დრო (წამი)" და „წამის მეასედი / კადრი (Milliseconds)".',
+      tutorialStep4: 'ეკრანზე დაუყოვნებლივ ნახავთ ვიდეოს მონტაჟის <b>საბოლოო ღირებულებას</b> რეალურ დროში.',
+      tutorialStep5: 'სურვილის შემთხვევაში, დააჭირეთ <b>„გაგზავნე შეკვეთა"</b> და გამომიგზავნეთ შეკვეთა <b>WhatsApp</b>-ზე ან <b>Telegram</b>-ზე.',
+      tutorialStep6: 'ვიდეოს გამოსაგზავნად ატვირთეთ ის <a href="https://wetransfer.com/" target="_blank" rel="noopener">wetransfer.com</a>-ზე, შემდეგ კი მიღებული ლინკი გამომიგზავნეთ <b>Telegram</b>-ზე ან <b>WhatsApp</b>-ზე.',
+
+      compressorLabel: 'VIDEO COMPRESSOR',
+      compIntro: 'ატვირთე მძიმე ვიდეო ფაილი და შეკუმშე სასურველ ზომამდე — დამუშავება 100% ხდება შენს ბრაუზერში (WebAssembly), ფაილი არსად იგზავნება და არავინ ხედავს მას.',
+      compDzTitle: 'ჩააგდე ან აირჩიე ვიდეო შესაკუმშად',
+      compDzSub: 'რეკომენდებულია 1.5GB-მდე ფაილები — ყველა დამუშავება ხდება ლოკალურად',
+      compOrigSize: 'ორიგინალი ზომა',
+      compTargetLabel: 'სასურველი საბოლოო ზომა (MB)',
+      compTargetHint: 'რაც უფრო პატარა ზომას აირჩევ ორიგინალთან შედარებით, მით მეტად დაეცემა ვიდეოს ხარისხი — სავარაუდო ბიტრეიტი: {BR} კბ/წმ',
+      compTargetHintLow: '⚠️ ეს ბიტრეიტი ძალიან დაბალია ({BR} კბ/წმ) — ვიდეოში შესამჩნევი იქნება ხარისხის დაკარგვა. სცადე უფრო დიდი სასურველი ზომა.',
+      compStartBtnText: 'შეკუმშვის დაწყება',
+      compLoadingModule: 'იტვირთება შეკუმშვის მოდული (პირველად შეიძლება ცოტა დრო დასჭირდეს)…',
+      compReadingFile: 'ფაილი იტვირთება...',
+      compEncoding: 'მიმდინარეობს შეკუმშვა…',
+      compFinalizing: 'საბოლოო ფაილი ემზადება…',
+      compFinalSize: 'საბოლოო ზომა',
+      compReduction: 'შემცირდა',
+      compDownloadBtnText: 'გადმოწერე შეკუმშული ვიდეო',
+      compResetBtnText: 'კიდევ ერთის შეკუმშვა',
+      compErrNotVideo: '⚠️ გთხოვთ ატვირთოთ ვიდეო ფაილი (mp4, mov, webm და სხვ.)',
+      compErrTooBig: '⚠️ ეს ფაილი ძალიან დიდია ბრაუზერში დასამუშავებლად (მაქს. ~1.5GB) — ბრაუზერს შეიძლება არ ეყოს მეხსიერება. სცადეთ უფრო პატარა ან უფრო მოკლე ვიდეო.',
+      compErrGeneric: '❌ შეკუმშვისას მოხდა შეცდომა — სცადეთ ხელახლა, ან სცადეთ უფრო პატარა ფაილით. თუ ბრაუზერის ტაბი ბევრ სხვა პროგრამასთან ერთად მუშაობდა, სცადეთ დახუროთ დანარჩენი ტაბები და კვლავ სცადეთ.',
+      compErrLoadModule: '❌ ვერ ჩაიტვირთა შეკუმშვის მოდული — შეამოწმეთ ინტერნეტ კავშირი და სცადეთ ხელახლა.',
+      compErrFileProtocol: '⚠️ ეს ფუნქცია არ მუშაობს, თუ index.html ფაილს პირდაპირ, ორჯერდაწკაპებით ხსნით ბრაუზერში (მისამართში წერია file://...). საჭიროა საიტი განთავსდეს რეალურ ჰოსტინგზე (მაგ. Netlify, GitHub Pages, ან თქვენი დომენი) — მხოლოდ მაშინ ჩაიტვირთება შეკუმშვის მოდული სწორად. ტესტირებისთვის შეგიძლიათ გამოიყენოთ ლოკალური სერვერიც.',
+      compNote: '⚠️ შეკუმშვა ხდება პირდაპირ შენს ბრაუზერში (WebAssembly-ით), სერვერზე არაფერი იტვირთება. ძალიან დიდი ან გრძელი ფაილების დამუშავებას შეიძლება რამდენიმე წუთი დასჭირდეს — გთხოვთ არ დახუროთ ტაბი პროცესის დასრულებამდე. მნიშვნელოვანია გვახსოვდეს: 100%-ით უხარისხოდ შეკუმშვა ფიზიკურად შეუძლებელია — რაც უფრო მცირე საბოლოო ზომას ირჩევთ, მით მეტი ხარისხი იკარგება მოცემულობის კანონის მიხედვით.',
+    },
+    en: {
+      visitorsLabel: 'Total visitors:',
+      topbarTagline: 'REAL-TIME PRICE ENGINE · AI EDITING',
+      heroTitle: 'Calculate your <span>video editing cost</span> down to the frame',
+      heroSub: 'Enter your video\'s duration (or upload a video and it will measure it automatically) — the price is calculated in real time, for After Effects & Topaz quality editing.',
+      priceReadout: 'PRICE READOUT',
+      finalPrice: 'Final price',
+      subActive: '✓ Subscriber rate is active — <b>you\'re already saving money!</b>',
+      notSubscribed: 'Not a subscriber yet — <b>subscribe to save money!</b>',
+      markDuration: 'Select exact duration (seconds)',
+      secondsPlaceholder: 'Enter seconds (0–59)',
+      msLabel: 'Hundredths of a second / frame (Milliseconds)',
+      msHint: 'Maximum total duration — 59:59. Within this range the price is calculated at the 59-second rate.',
+      qualityLabel: 'Video quality (resolution / fps)',
+      qualityRecBadge: 'Recommended',
+      qualityWarnText: '⚠️ We recommend the 1080p/60fps format — with the higher-quality formats, the video may glitch or slow down on its own for viewers.',
+      subscriberT1: "I'm a channel subscriber",
+      subscriberT2: '✓ Lower rate activates',
+      tiktokLabel: 'Your TikTok profile link *',
+      tiktokError: '⚠️ A TikTok profile link is required to send the order!',
+      videoScanner: 'VIDEO SCANNER',
+      dzTitle: 'Upload a video for automatic measurement',
+      dzSub: 'Drag it here or click — duration will be filled in automatically',
+      scanProcessing: 'Processing video…',
+      srFile: 'File',
+      srDuration: 'Duration',
+      srDetectedFormat: 'Uploaded video format',
+      srRequestedFormat: 'Requested quality',
+      srPrice: 'Calculated price',
+      srUnit: 's',
+      srFpsUnknown: 'fps unknown',
+      srMatchNote: '✓ The uploaded video matches the requested quality ({REQ})',
+      srMismatchNote: '⚠️ You requested {REQ}, but the uploaded video is actually {DET} quality — the price is still calculated based on your requested quality ({REQ}).',
+      srWarnOver: '⚠️ The video exceeds 59.59 seconds — it is priced individually; the calculator shows the 59.59 rate.',
+      alertNotVideo: 'Please upload a video file (mp4, mov, webm, etc.)',
+      alertReadError: 'Could not read the video — please try another file.',
+      sendOrder: 'Send order',
+      sendWA: 'Send via WhatsApp',
+      sendTG: 'Send via Telegram',
+      tgSentNote: "✓ Opening MOON's Telegram chat (@MOON_TG) — the text has also been copied as a backup",
+      warnTitle: 'Notice before ordering',
+      warnP1: 'Video editing is done <b>only for TikTok</b>, with flawless quality.',
+      warnP2: 'Please make sure your video duration <b>does not exceed 59:59 seconds</b> — anything longer is priced individually and isn\'t included in the calculator.',
+      warnP3: 'Also make sure the footage is shot and rendered in <b>1080p / 60fps</b> quality — this affects the cleanliness of the final result.',
+      warnP4: 'The calculator also offers <b>1080p/120fps, 2K/60fps, 2K/120fps, 4K/60fps and 4K/120fps</b> options, but we don\'t recommend them — the video may glitch or slow down on its own for viewers.',
+      footer: 'FRAME.RATE — precise calculation, down to the frame',
+      chatAssistant: 'Assistant',
+      chatOnline: 'Online',
+      chatInputPlaceholder: 'Ask a question…',
+      chartLabel: 'Price comparison at the current duration',
+      adminTitle: 'Admin panel',
+      adminPassPh: 'Password',
+      adminEnter: 'Enter',
+      adminWrongPass: 'Incorrect password',
+      adminClose: 'Close',
+      adminTabVisits: 'Visitors',
+      adminNoVisits: 'No visits recorded yet.',
+      tutorialLabel: 'How to place an order?',
+      tutorialToggleText: 'Show details',
+      tutorialStep1: 'Choose the <b>video format / quality</b> you want (resolution and fps) in the calculator.',
+      tutorialStep2: 'If you <b>don\'t know the exact duration</b> of your video — upload it to the <b>VIDEO SCANNER</b> and the duration will be measured automatically and filled into the calculator.',
+      tutorialStep3: 'If you <b>know the exact duration</b> — enter it manually in the "Select exact duration (seconds)" and "Hundredths of a second / frame (Milliseconds)" fields.',
+      tutorialStep4: 'You\'ll immediately see the <b>final editing price</b> on screen, in real time.',
+      tutorialStep5: 'If you\'d like to order, click <b>"Send order"</b> and send it to us via <b>WhatsApp</b> or <b>Telegram</b>.',
+      tutorialStep6: 'To send the video itself, upload it to <a href="https://wetransfer.com/" target="_blank" rel="noopener">wetransfer.com</a>, then send us the resulting link via <b>Telegram</b> or <b>WhatsApp</b>.',
+
+      compressorLabel: 'VIDEO COMPRESSOR',
+      compIntro: 'Upload a heavy video file and shrink it to your target size — everything runs 100% in your browser (WebAssembly), the file is never uploaded anywhere and no one sees it.',
+      compDzTitle: 'Drag it here or click to select a video to compress',
+      compDzSub: 'Recommended up to 1.5GB — all processing happens locally',
+      compOrigSize: 'Original size',
+      compTargetLabel: 'Target final size (MB)',
+      compTargetHint: 'The smaller the target size compared to the original, the more quality will drop — estimated bitrate: {BR} kbps',
+      compTargetHintLow: '⚠️ This bitrate is very low ({BR} kbps) — noticeable quality loss is expected. Try a larger target size.',
+      compStartBtnText: 'Start compressing',
+      compLoadingModule: 'Loading the compression module (may take a moment on first use)…',
+      compReadingFile: 'Loading the file...',
+      compEncoding: 'Compressing…',
+      compFinalizing: 'Finalizing the output file…',
+      compFinalSize: 'Final size',
+      compReduction: 'Reduced by',
+      compDownloadBtnText: 'Download compressed video',
+      compResetBtnText: 'Compress another one',
+      compErrNotVideo: '⚠️ Please upload a video file (mp4, mov, webm, etc.)',
+      compErrTooBig: '⚠️ This file is too large to process in a browser (max ~1.5GB) — the browser may run out of memory. Try a smaller or shorter video.',
+      compErrGeneric: '❌ Something went wrong while compressing — please try again, or try a smaller file. If the browser tab has a lot of other tabs/apps running, try closing them and retry.',
+      compErrLoadModule: '❌ Could not load the compression module — check your internet connection and try again.',
+      compErrFileProtocol: '⚠️ This feature doesn\'t work if you open index.html directly by double-clicking it (the address bar shows file://...). The site needs to be served over http(s):// — deployed on real hosting (e.g. Netlify, GitHub Pages, or your own domain), or run through a local dev server for testing.',
+      compNote: '⚠️ Compression runs entirely in your browser (WebAssembly) — nothing is uploaded to a server. Very large or long files may take several minutes; please don\'t close the tab until it finishes. Important: perfectly lossless compression is not physically possible — the smaller the target size you choose, the more quality is lost.',
+    }
+  };
+
+  let currentLang = localStorage.getItem('moon_lang') || 'ka';
+
+  function t(key){
+    return (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang][key]) || (TRANSLATIONS.ka[key] || '');
+  }
+
+  function applyTranslations(){
+    document.documentElement.lang = currentLang;
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      if (TRANSLATIONS[currentLang][key] !== undefined) {
+        el.innerHTML = TRANSLATIONS[currentLang][key];
+      }
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      const key = el.getAttribute('data-i18n-placeholder');
+      if (TRANSLATIONS[currentLang][key] !== undefined) {
+        el.placeholder = TRANSLATIONS[currentLang][key];
+      }
+    });
+    document.getElementById('langKa').classList.toggle('active', currentLang === 'ka');
+    document.getElementById('langEn').classList.toggle('active', currentLang === 'en');
+    if (typeof refresh === 'function') refresh();
+    if (typeof window.updateCompBitrateHint === 'function') window.updateCompBitrateHint();
+  }
+
+  function setLanguage(lang){
+    if (lang !== 'ka' && lang !== 'en') return;
+    currentLang = lang;
+    localStorage.setItem('moon_lang', lang);
+    applyTranslations();
+  }
+
+  document.getElementById('langKa').addEventListener('click', () => setLanguage('ka'));
+  document.getElementById('langEn').addEventListener('click', () => setLanguage('en'));
+
+  // ============================================================
+  // 1) PRICE CALCULATOR (core logic, unchanged rate model)
+  // ============================================================
+  const secondsRange = document.getElementById('secondsRange');
+  const secondsInput = document.getElementById('secondsInput');
+  const msRange = document.getElementById('msRange');
+  const secVal = document.getElementById('secVal');
+  const msVal = document.getElementById('msVal');
+  const subToggle = document.getElementById('subToggle');
+  const priceDisplay = document.getElementById('priceDisplay');
+  const subNote = document.getElementById('subNote');
+  const tiktokLink = document.getElementById('tiktokLink');
+  const tiktokError = document.getElementById('tiktokError');
+
+  // PRICE_SCALE anchors the 5-second, non-subscriber rate (0.24₾/s) to a final
+  // 5s price for each video format. 1080p/60fps is the base format at 1.30₾,
+  // and every higher-quality format (more pixels and/or more frames to process)
+  // is scaled up from that same base by the same method — only the scale
+  // factor changes, the declining-rate shape (5s → 59.59s) is identical for
+  // every format.
+  const QUALITY_SCALES = {
+    '1080_60':  1.30 / 1.2,   // 1080p · 60fps  → 1.30₾ @5s / ~13.13₾ @59.59s (base, recommended)
+    '1080_120': 1.60 / 1.2,   // 1080p · 120fps → 1.60₾ @5s / ~16.16₾ @59.59s
+    '2k_60':    1.90 / 1.2,   // 2K    · 60fps  → 1.90₾ @5s / ~19.19₾ @59.59s
+    '2k_120':   2.20 / 1.2,   // 2K    · 120fps → 2.20₾ @5s / ~22.22₾ @59.59s
+    '4k_60':    2.60 / 1.2,   // 4K    · 60fps  → 2.60₾ @5s / ~26.26₾ @59.59s
+    '4k_120':   3.00 / 1.2    // 4K    · 120fps → 3.00₾ @5s / ~30.30₾ @59.59s
+  };
+
+  const QUALITY_LABELS = {
+    '1080_60':  '1080p · 60fps',
+    '1080_120': '1080p · 120fps',
+    '2k_60':    '2K · 60fps',
+    '2k_120':   '2K · 120fps',
+    '4k_60':    '4K · 60fps',
+    '4k_120':   '4K · 120fps'
+  };
+
+  let currentQuality = '1080_60';
+
+  function calculateExactPrice(seconds, milliseconds, isSubscriber, quality) {
+    const s = Math.max(0, Math.min(59, parseFloat(seconds || 0)));
+    const ms = Math.max(0, Math.min(59, parseFloat(milliseconds || 0)));
+    const totalSeconds = s + (ms / 100);
+
+    const billedSecondsForRate = Math.max(Math.min(s, 59), 5);
+
+    const PRICE_SCALE = QUALITY_SCALES[quality] || QUALITY_SCALES['1080_60'];
+
+    let ratePerSecond;
+    if (isSubscriber) {
+      ratePerSecond = 0.20 - ((billedSecondsForRate - 5) / 54) * (0.20 - 0.1525);
+    } else {
+      ratePerSecond = 0.24 - ((billedSecondsForRate - 5) / 54) * (0.24 - 0.2033);
+    }
+
+    let billedSeconds;
+    if (totalSeconds < 5) {
+      billedSeconds = 5;
+    } else if (s >= 59) {
+      billedSeconds = 59;
+    } else {
+      billedSeconds = totalSeconds;
+    }
+
+    const totalPrice = billedSeconds * ratePerSecond * PRICE_SCALE;
+    return totalPrice.toFixed(2);
+  }
+
+  function currentValues(){
+    let s = parseFloat(secondsInput.value || 0);
+    let ms = parseFloat(msRange.value || 0);
+    if (isNaN(s) || s < 0) s = 0;
+    if (s > 59) s = 59;
+    if (isNaN(ms) || ms < 0) ms = 0;
+    if (ms > 59) ms = 59;
+    return { s, ms, isSub: subToggle.checked, quality: currentQuality };
+  }
+
+  function refresh(){
+    const { s, ms, isSub, quality } = currentValues();
+
+    secondsInput.value = s;
+    secondsRange.value = Math.min(Math.max(s,5),59);
+    msRange.value = ms;
+
+    secVal.textContent = s;
+    msVal.textContent = String(ms).padStart(2,'0');
+
+    const price = calculateExactPrice(s, ms, isSub, quality);
+    priceDisplay.innerHTML = price + '<sup>₾</sup>';
+    priceDisplay.classList.remove('bump');
+    requestAnimationFrame(() => requestAnimationFrame(() => priceDisplay.classList.add('bump')));
+
+    subNote.innerHTML = isSub ? t('subActive') : t('notSubscribed');
+
+    if (typeof renderPriceChart === 'function') renderPriceChart();
+
+    return price;
+  }
+
+  // Slider 'input' events can fire far more often than the screen can
+  // repaint (especially while dragging on touch devices). Coalesce
+  // bursts of events into a single refresh() per animation frame so
+  // the chart rebuild + price calc doesn't run dozens of times a second.
+  let refreshQueued = false;
+  function scheduleRefresh(){
+    if (refreshQueued) return;
+    refreshQueued = true;
+    requestAnimationFrame(() => {
+      refreshQueued = false;
+      refresh();
+    });
+  }
+
+  secondsRange.addEventListener('input', () => {
+    secondsInput.value = secondsRange.value;
+    scheduleRefresh();
+  });
+  secondsInput.addEventListener('input', () => scheduleRefresh());
+  secondsInput.addEventListener('blur', () => {
+    let v = parseFloat(secondsInput.value || 0);
+    if (isNaN(v) || v < 0) v = 0;
+    if (v > 59) v = 59;
+    secondsInput.value = v;
+    refresh();
+  });
+  msRange.addEventListener('input', () => scheduleRefresh());
+  subToggle.addEventListener('change', () => refresh());
+
+  const qualityGrid = document.getElementById('qualityGrid');
+  const qualityWarn = document.getElementById('qualityWarn');
+
+  function selectQuality(key){
+    if (!QUALITY_SCALES[key]) key = '1080_60';
+    currentQuality = key;
+    qualityGrid.querySelectorAll('.quality-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-quality') === key));
+    qualityWarn.classList.toggle('show', currentQuality !== '1080_60');
+  }
+
+  // Maps a scanned video's pixel dimensions + measured frame rate to the
+  // closest quality tier the calculator actually offers. Resolution is judged
+  // by the larger of the two dimensions (videos can be portrait or landscape);
+  // frame rate below 100fps is treated as the 60fps tier, since footage is
+  // essentially never shot at anything between 60 and 120 that isn't one or
+  // the other after rounding/variable-frame-rate jitter.
+  function detectQualityTier(width, height, fps){
+    const maxDim = Math.max(width || 0, height || 0);
+    let resTier = '1080';
+    if (maxDim >= 3600) resTier = '4k';
+    else if (maxDim >= 2400) resTier = '2k';
+    const fpsTier = (fps && fps >= 100) ? '120' : '60';
+    const key = `${resTier}_${fpsTier}`;
+    return QUALITY_SCALES[key] ? key : '1080_60';
+  }
+
+  qualityGrid.querySelectorAll('.quality-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectQuality(btn.getAttribute('data-quality'));
+      refresh();
+    });
+  });
+
+  tiktokLink.addEventListener('input', () => {
+    if (tiktokLink.value.trim() !== '') {
+      tiktokLink.classList.remove('error');
+      tiktokError.style.display = 'none';
+    }
+  });
+
+  refresh();
+
+  // ============================================================
+  // 2) VIDEO DURATION SCANNER
+  // ============================================================
+  const dropZone = document.getElementById('dropZone');
+  const videoInput = document.getElementById('videoInput');
+  const scanProgress = document.getElementById('scanProgress');
+  const scanResult = document.getElementById('scanResult');
+  const srName = document.getElementById('srName');
+  const srDuration = document.getElementById('srDuration');
+  const srRequested = document.getElementById('srRequested');
+  const srQualityRow = document.getElementById('srQualityRow');
+  const srQuality = document.getElementById('srQuality');
+  const srPrice = document.getElementById('srPrice');
+  const srMatchNote = document.getElementById('srMatchNote');
+  const srMismatchNote = document.getElementById('srMismatchNote');
+  const srWarn = document.getElementById('srWarn');
+
+  ['dragover','dragenter'].forEach(evt => dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.add('dragover'); }));
+  ['dragleave','drop'].forEach(evt => dropZone.addEventListener(evt, e => { dropZone.classList.remove('dragover'); }));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleVideoFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  videoInput.addEventListener('change', e => {
+    if (e.target.files && e.target.files[0]) handleVideoFile(e.target.files[0]);
+  });
+
+  function handleVideoFile(file){
+    if (!file.type.startsWith('video/')) {
+      alert(t('alertNotVideo'));
+      return;
+    }
+    scanResult.classList.remove('show');
+    scanProgress.classList.add('show');
+
+    const videoEl = document.createElement('video');
+    videoEl.preload = 'metadata';
+    videoEl.muted = true;
+    videoEl.playsInline = true;
+    // Kept off-screen but still attached to the document: some browsers only
+    // fire requestVideoFrameCallback (used below for fps detection) reliably
+    // for elements that are part of the render tree.
+    videoEl.style.cssText = 'position:fixed; left:-9999px; top:0; width:2px; height:2px; opacity:0; pointer-events:none;';
+    document.body.appendChild(videoEl);
+
+    const cleanup = () => {
+      scanProgress.classList.remove('show');
+      URL.revokeObjectURL(videoEl.src);
+      videoEl.remove();
+    };
+
+    const proceed = (duration) => {
+      const width = videoEl.videoWidth;
+      const height = videoEl.videoHeight;
+      detectFrameRate(videoEl).then(fps => {
+        finishScan(duration, file, width, height, fps);
+        cleanup();
+      });
+    };
+
+    videoEl.onloadedmetadata = function(){
+      // Chrome bug workaround: some containers report Infinity duration
+      // until a seek forces the real value to resolve.
+      if (videoEl.duration === Infinity || isNaN(videoEl.duration)) {
+        videoEl.currentTime = 1e101;
+        videoEl.ontimeupdate = function(){
+          videoEl.ontimeupdate = null;
+          const dur = videoEl.duration;
+          videoEl.currentTime = 0;
+          proceed(dur);
+        };
+      } else {
+        proceed(videoEl.duration);
+      }
+    };
+
+    videoEl.onerror = function(){
+      cleanup();
+      alert(t('alertReadError'));
+    };
+
+    videoEl.src = URL.createObjectURL(file);
+  }
+
+  // Browsers don't expose a video's encoded frame rate as plain metadata, so
+  // this plays a couple of silent, invisible frames and times the gaps between
+  // them via requestVideoFrameCallback, then snaps the result to the nearest
+  // common rate (24/25/30/50/60/120). Falls back to null (unknown) on browsers
+  // that don't support requestVideoFrameCallback, or if playback is blocked.
+  function detectFrameRate(videoEl){
+    return new Promise((resolve) => {
+      if (typeof videoEl.requestVideoFrameCallback !== 'function') {
+        resolve(null);
+        return;
+      }
+      const samples = [];
+      let settled = false;
+      let safetyTimer = null;
+
+      function finish(fps){
+        if (settled) return;
+        settled = true;
+        if (safetyTimer) clearTimeout(safetyTimer);
+        videoEl.pause();
+        resolve(fps);
+      }
+
+      function computeAndFinish(){
+        if (samples.length < 3) { finish(null); return; }
+        const deltas = [];
+        for (let i = 1; i < samples.length; i++) {
+          const d = samples[i] - samples[i - 1];
+          if (d > 0) deltas.push(d);
+        }
+        if (!deltas.length) { finish(null); return; }
+        deltas.sort((a, b) => a - b);
+        const mid = deltas[Math.floor(deltas.length / 2)];
+        const rawFps = 1 / mid;
+        const commonRates = [24, 25, 30, 50, 60, 120];
+        let closest = Math.round(rawFps);
+        let bestDiff = Infinity;
+        commonRates.forEach(r => {
+          const diff = Math.abs(r - rawFps);
+          if (diff < bestDiff) { bestDiff = diff; closest = r; }
+        });
+        finish(closest);
+      }
+
+      function onFrame(now, metadata){
+        samples.push(metadata.mediaTime);
+        if (samples.length < 10 && !settled) {
+          videoEl.requestVideoFrameCallback(onFrame);
+        } else {
+          computeAndFinish();
+        }
+      }
+
+      safetyTimer = setTimeout(() => computeAndFinish(), 1200);
+
+      videoEl.play().then(() => {
+        videoEl.requestVideoFrameCallback(onFrame);
+      }).catch(() => finish(null));
+    });
+  }
+
+  function finishScan(duration, file, width, height, fps){
+    let s = Math.floor(duration);
+    let ms = Math.round((duration - s) * 100);
+    if (ms === 100) { ms = 0; s += 1; }
+
+    const overLimit = (s > 59) || (s === 59 && ms > 59);
+    const sForCalc = Math.min(s, 59);
+    const msForCalc = overLimit ? 59 : ms;
+
+    secondsInput.value = sForCalc;
+    msRange.value = msForCalc;
+
+    // The user's own quality selection always drives the price — the scanner
+    // only reports what it found in the file for comparison, it never
+    // overrides the requested format.
+    const requestedQuality = currentQuality;
+    const hasDimensions = !!(width && height);
+    const detectedQuality = hasDimensions ? detectQualityTier(width, height, fps) : null;
+
+    const price = refresh();
+
+    srName.textContent = file.name.length > 24 ? file.name.slice(0,21) + '…' : file.name;
+    srDuration.textContent = `${s}.${String(ms).padStart(2,'0')} ${t('srUnit')}`;
+    srRequested.textContent = QUALITY_LABELS[requestedQuality] || QUALITY_LABELS['1080_60'];
+    srPrice.textContent = price + ' ₾';
+
+    if (hasDimensions) {
+      const fpsLabel = fps ? `${fps}fps` : t('srFpsUnknown');
+      srQuality.textContent = `${width}×${height} · ${fpsLabel}`;
+      srQualityRow.style.display = 'flex';
+
+      const reqLabel = QUALITY_LABELS[requestedQuality] || QUALITY_LABELS['1080_60'];
+      const detLabel = QUALITY_LABELS[detectedQuality] || QUALITY_LABELS['1080_60'];
+      if (detectedQuality === requestedQuality) {
+        srMatchNote.textContent = t('srMatchNote').replace('{REQ}', reqLabel);
+        srMatchNote.style.display = 'block';
+        srMismatchNote.style.display = 'none';
+      } else {
+        srMismatchNote.textContent = t('srMismatchNote').replace(/{REQ}/g, reqLabel).replace('{DET}', detLabel);
+        srMismatchNote.style.display = 'block';
+        srMatchNote.style.display = 'none';
+      }
+    } else {
+      srQualityRow.style.display = 'none';
+      srMatchNote.style.display = 'none';
+      srMismatchNote.style.display = 'none';
+    }
+
+    if (overLimit) {
+      srWarn.style.display = 'block';
+      srWarn.textContent = t('srWarnOver');
+    } else {
+      srWarn.style.display = 'none';
+    }
+
+    scanResult.classList.add('show');
+  }
+
+  // ============================================================
+  // 2B) VIDEO COMPRESSOR — 100% client-side, WebAssembly (ffmpeg.wasm)
+  // No file is ever uploaded to any server: everything below runs
+  // inside the visitor's own browser tab.
+  // ============================================================
+  (function initCompressor(){
+    const compDropZone = document.getElementById('compDropZone');
+    const compVideoInput = document.getElementById('compVideoInput');
+    const compFileInfo = document.getElementById('compFileInfo');
+    const compFileName = document.getElementById('compFileName');
+    const compFileDuration = document.getElementById('compFileDuration');
+    const compFileSize = document.getElementById('compFileSize');
+    const compTargetField = document.getElementById('compTargetField');
+    const compTargetVal = document.getElementById('compTargetVal');
+    const compTargetRange = document.getElementById('compTargetRange');
+    const compTargetInput = document.getElementById('compTargetInput');
+    const compBitrateHint = document.getElementById('compBitrateHint');
+    const compStartBtn = document.getElementById('compStartBtn');
+    const compProgress = document.getElementById('compProgress');
+    const compProgressLabel = document.getElementById('compProgressLabel');
+    const compProgressBarWrap = document.getElementById('compProgressBarWrap');
+    const compProgressFill = document.getElementById('compProgressFill');
+    const compProgressPercent = document.getElementById('compProgressPercent');
+    const compResult = document.getElementById('compResult');
+    const compResOrig = document.getElementById('compResOrig');
+    const compResFinal = document.getElementById('compResFinal');
+    const compResReduction = document.getElementById('compResReduction');
+    const compDownloadBtn = document.getElementById('compDownloadBtn');
+    const compResetBtn = document.getElementById('compResetBtn');
+    const compError = document.getElementById('compError');
+
+    const MAX_BYTES = 1.5 * 1024 * 1024 * 1024; // ~1.5GB soft cap — browser wasm memory is limited
+    const FFMPEG_VER = '0.12.10';
+    const UTIL_VER = '0.12.1'; // NOTE: @ffmpeg/util@0.12.2's UMD build has a known bug
+                                // where it doesn't set window.FFmpegUtil correctly — stick to 0.12.1
+    const CORE_VER = '0.12.10';
+
+    let compState = {
+      file: null,
+      duration: 0,
+      lastObjectUrl: null
+    };
+    let ffmpegInstance = null;
+    let ffmpegLoadPromise = null;
+
+    function fmtMB(bytes){ return (bytes / (1024 * 1024)).toFixed(2) + ' MB'; }
+    function fmtDuration(sec){
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m}:${String(s).padStart(2,'0')}`;
+    }
+
+    function showError(msg){
+      compError.textContent = msg;
+      compError.style.display = 'block';
+    }
+    function clearError(){
+      compError.style.display = 'none';
+      compError.textContent = '';
+    }
+
+    // Estimates a video bitrate (kbps) that lands close to the requested
+    // final size, the same size-first approach the desktop app used
+    // (target bitrate) rather than a fixed quality/CRF value.
+    function estimateBitrate(targetMB, durationSec){
+      if (!durationSec || durationSec <= 0) return { video: 0, audio: 128 };
+      const totalKbps = (targetMB * 8192) / durationSec; // MB -> kilobits budget / seconds
+      let audioKbps = 128;
+      if (totalKbps > 800) audioKbps = 160;
+      else if (totalKbps > 300) audioKbps = 128;
+      else if (totalKbps > 150) audioKbps = 96;
+      else audioKbps = 64;
+      const videoKbps = Math.max(80, Math.floor(totalKbps - audioKbps));
+      return { video: videoKbps, audio: audioKbps };
+    }
+
+    function updateBitrateHint(){
+      if (!compState.duration) return;
+      const targetMB = parseFloat(compTargetInput.value) || 30;
+      const { video } = estimateBitrate(targetMB, compState.duration);
+      if (video < 300) {
+        compBitrateHint.innerHTML = t('compTargetHintLow').replace('{BR}', video);
+      } else {
+        compBitrateHint.innerHTML = t('compTargetHint').replace('{BR}', video);
+      }
+    }
+    window.updateCompBitrateHint = updateBitrateHint;
+
+    ['dragover','dragenter'].forEach(evt => compDropZone.addEventListener(evt, e => { e.preventDefault(); compDropZone.classList.add('dragover'); }));
+    ['dragleave','drop'].forEach(evt => compDropZone.addEventListener(evt, e => { compDropZone.classList.remove('dragover'); }));
+    compDropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) handleCompFile(e.dataTransfer.files[0]);
+    });
+    compVideoInput.addEventListener('change', e => {
+      if (e.target.files && e.target.files[0]) handleCompFile(e.target.files[0]);
+    });
+
+    function handleCompFile(file){
+      clearError();
+      compResult.classList.remove('show');
+      if (!file.type.startsWith('video/')) {
+        showError(t('compErrNotVideo'));
+        return;
+      }
+      if (file.size > MAX_BYTES) {
+        showError(t('compErrTooBig'));
+        return;
+      }
+
+      const videoEl = document.createElement('video');
+      videoEl.preload = 'metadata';
+      videoEl.muted = true;
+      videoEl.src = URL.createObjectURL(file);
+
+      const cleanup = () => URL.revokeObjectURL(videoEl.src);
+
+      const proceed = (duration) => {
+        compState.file = file;
+        compState.duration = duration;
+
+        compFileName.textContent = file.name.length > 28 ? file.name.slice(0,25) + '…' : file.name;
+        compFileDuration.textContent = fmtDuration(duration);
+        compFileSize.textContent = fmtMB(file.size);
+        compFileInfo.classList.add('show');
+
+        // Default target: 30MB, but never suggest a target larger than the
+        // original file itself.
+        const origMB = file.size / (1024 * 1024);
+        const defaultTarget = Math.max(5, Math.min(30, Math.floor(origMB * 0.9)));
+        compTargetRange.max = Math.max(50, Math.ceil(origMB));
+        compTargetRange.value = defaultTarget;
+        compTargetInput.value = defaultTarget;
+        compTargetVal.textContent = defaultTarget;
+
+        compTargetField.style.display = 'block';
+        compStartBtn.style.display = 'flex';
+        updateBitrateHint();
+        cleanup();
+      };
+
+      videoEl.onloadedmetadata = function(){
+        if (videoEl.duration === Infinity || isNaN(videoEl.duration)) {
+          videoEl.currentTime = 1e101;
+          videoEl.ontimeupdate = function(){
+            videoEl.ontimeupdate = null;
+            proceed(videoEl.duration);
+          };
+        } else {
+          proceed(videoEl.duration);
+        }
+      };
+      videoEl.onerror = function(){
+        cleanup();
+        showError(t('compErrNotVideo'));
+      };
+    }
+
+    compTargetRange.addEventListener('input', () => {
+      compTargetInput.value = compTargetRange.value;
+      compTargetVal.textContent = compTargetRange.value;
+      updateBitrateHint();
+    });
+    compTargetInput.addEventListener('input', () => {
+      let v = parseInt(compTargetInput.value, 10);
+      if (isNaN(v)) return;
+      compTargetVal.textContent = v;
+      if (v <= parseInt(compTargetRange.max, 10)) compTargetRange.value = v;
+      updateBitrateHint();
+    });
+
+    // Lazily injects the ffmpeg.wasm <script> tags — most visitors only
+    // want the price calculator, so this multi-MB module is fetched only
+    // once someone actually presses "start compressing".
+    function loadScript(src){
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = () => reject(new Error('script load failed: ' + src));
+        document.head.appendChild(s);
+      });
+    }
+
+    async function ensureFFmpeg(){
+      if (ffmpegInstance) return ffmpegInstance;
+      if (ffmpegLoadPromise) return ffmpegLoadPromise;
+
+      ffmpegLoadPromise = (async () => {
+        if (typeof window.FFmpegWASM === 'undefined') {
+          await loadScript(`https://unpkg.com/@ffmpeg/ffmpeg@${FFMPEG_VER}/dist/umd/ffmpeg.js`);
+        }
+        if (typeof window.FFmpegWASM === 'undefined') {
+          throw new Error('window.FFmpegWASM did not load (CDN script loaded but global was not set)');
+        }
+        if (typeof window.FFmpegUtil === 'undefined') {
+          await loadScript(`https://unpkg.com/@ffmpeg/util@${UTIL_VER}/dist/umd/index.js`);
+        }
+        if (typeof window.FFmpegUtil === 'undefined') {
+          throw new Error('window.FFmpegUtil did not load (CDN script loaded but global was not set)');
+        }
+        const { FFmpeg } = window.FFmpegWASM;
+        const { toBlobURL } = window.FFmpegUtil;
+        const ffmpeg = new FFmpeg();
+        const baseURL = `https://unpkg.com/@ffmpeg/core@${CORE_VER}/dist/umd`;
+        const ffmpegPkgURL = `https://unpkg.com/@ffmpeg/ffmpeg@${FFMPEG_VER}/dist/umd`;
+        await ffmpeg.load({
+          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+          // The UMD build of @ffmpeg/ffmpeg spawns its own internal Worker
+          // from a relative chunk file (e.g. 814.ffmpeg.js). Since ffmpeg.js
+          // itself was loaded from a different origin (the CDN), the browser
+          // blocks that Worker() call as cross-origin. Fetching the chunk
+          // ourselves and handing it over as a blob: URL sidesteps that,
+          // because blob: URLs are always treated as same-origin.
+          classWorkerURL: await toBlobURL(`${ffmpegPkgURL}/814.ffmpeg.js`, 'text/javascript'),
+        });
+        ffmpegInstance = ffmpeg;
+        return ffmpeg;
+      })();
+
+      // If loading fails, clear the cached promise so a retry (e.g. after
+      // the person switches network or CDN) can actually try again instead
+      // of forever returning the same rejected promise.
+      ffmpegLoadPromise.catch(() => { ffmpegLoadPromise = null; });
+
+      return ffmpegLoadPromise;
+    }
+
+    compStartBtn.addEventListener('click', async () => {
+      if (!compState.file) return;
+      clearError();
+
+      // ffmpeg.wasm fetches its core files via fetch()/toBlobURL, which
+      // browsers block for pages opened directly as file:// (double-clicked
+      // locally). It only works once the page is actually served over
+      // http(s):// — a real host, or a local dev server for testing.
+      if (location.protocol === 'file:') {
+        showError(t('compErrFileProtocol'));
+        return;
+      }
+
+      compResult.classList.remove('show');
+      compStartBtn.disabled = true;
+      compProgress.classList.add('show');
+      compProgressLabel.textContent = t('compLoadingModule');
+      compProgressBarWrap.classList.remove('show');
+      compProgressFill.style.width = '0%';
+      compProgressPercent.textContent = '0%';
+
+      let ffmpeg;
+      try {
+        ffmpeg = await ensureFFmpeg();
+      } catch (err) {
+        console.error('[compressor] failed to load ffmpeg.wasm:', err);
+        compProgress.classList.remove('show');
+        compStartBtn.disabled = false;
+        showError(t('compErrLoadModule'));
+        return;
+      }
+
+      try {
+        const { fetchFile } = window.FFmpegUtil;
+        const targetMB = parseFloat(compTargetInput.value) || 30;
+        const { video: vKbps, audio: aKbps } = estimateBitrate(targetMB, compState.duration);
+        const maxrate = Math.round(vKbps * 1.45);
+        const bufsize = Math.round(vKbps * 2);
+
+        const inputName = 'input' + (compState.file.name.match(/\.[a-zA-Z0-9]+$/)?.[0] || '.mp4');
+        const outputName = 'output.mp4';
+
+        compProgressLabel.textContent = t('compReadingFile');
+        await ffmpeg.writeFile(inputName, await fetchFile(compState.file));
+
+        compProgressLabel.textContent = t('compEncoding');
+        compProgressBarWrap.classList.add('show');
+
+        const onProgress = ({ progress }) => {
+          const pct = Math.max(0, Math.min(100, Math.round((progress || 0) * 100)));
+          compProgressFill.style.width = pct + '%';
+          compProgressPercent.textContent = pct + '%';
+        };
+        ffmpeg.on('progress', onProgress);
+
+        await ffmpeg.exec([
+          '-i', inputName,
+          '-c:v', 'libx264',
+          '-preset', 'veryfast',
+          '-b:v', `${vKbps}k`,
+          '-maxrate', `${maxrate}k`,
+          '-bufsize', `${bufsize}k`,
+          '-c:a', 'aac',
+          '-b:a', `${aKbps}k`,
+          '-movflags', '+faststart',
+          outputName
+        ]);
+
+        ffmpeg.off('progress', onProgress);
+        compProgressLabel.textContent = t('compFinalizing');
+
+        const data = await ffmpeg.readFile(outputName);
+        const blob = new Blob([data.buffer], { type: 'video/mp4' });
+
+        if (compState.lastObjectUrl) URL.revokeObjectURL(compState.lastObjectUrl);
+        const url = URL.createObjectURL(blob);
+        compState.lastObjectUrl = url;
+
+        const origBytes = compState.file.size;
+        const finalBytes = blob.size;
+        const reduction = origBytes > 0 ? ((origBytes - finalBytes) / origBytes * 100) : 0;
+
+        compResOrig.textContent = fmtMB(origBytes);
+        compResFinal.textContent = fmtMB(finalBytes);
+        compResReduction.textContent = reduction.toFixed(1) + '%';
+
+        const baseName = compState.file.name.replace(/\.[a-zA-Z0-9]+$/, '');
+        compDownloadBtn.href = url;
+        compDownloadBtn.download = `${baseName}_compressed.mp4`;
+
+        // Clean up the wasm virtual filesystem so a second run doesn't
+        // accumulate memory across files.
+        try { await ffmpeg.deleteFile(inputName); } catch(_) {}
+        try { await ffmpeg.deleteFile(outputName); } catch(_) {}
+
+        compProgress.classList.remove('show');
+        compResult.classList.add('show');
+      } catch (err) {
+        console.error('[compressor] compression failed:', err);
+        compProgress.classList.remove('show');
+        compProgressBarWrap.classList.remove('show');
+        showError(t('compErrGeneric'));
+      } finally {
+        compStartBtn.disabled = false;
+      }
+    });
+
+    compResetBtn.addEventListener('click', () => {
+      compState.file = null;
+      compState.duration = 0;
+      compVideoInput.value = '';
+      compFileInfo.classList.remove('show');
+      compTargetField.style.display = 'none';
+      compStartBtn.style.display = 'none';
+      compResult.classList.remove('show');
+      clearError();
+    });
+  })();
+
+  // ============================================================
+  // 3) MULTI-CHANNEL ORDER SENDING (WhatsApp / Telegram)
+  // ============================================================
+  const PHONE_INTL = "995592630630"; // ნომერი WhatsApp-ისთვის
+  const TELEGRAM_USERNAME = "Moonknight0012"; // პირდაპირი Telegram ანგარიში შეკვეთებისთვის
+  const copyNote = document.getElementById('copyNote');
+
+  function buildOrderMessage(){
+    const { s, ms, isSub, quality } = currentValues();
+    const price = calculateExactPrice(s, ms, isSub, quality);
+    return `🎬 ახალი შეკვეთა — MOON
+ხანგრძლივობა: ${s}.${String(ms).padStart(2,'0')} წამი
+ხარისხი: ${QUALITY_LABELS[quality] || QUALITY_LABELS['1080_60']}
+გამომწერი: ${isSub ? 'დიახ' : 'არა'}
+ღირებულება: ${price} ₾
+TikTok პროფილი: ${tiktokLink.value.trim()}`;
+  }
+
+  function validateBeforeSend(){
+    const linkVal = tiktokLink.value.trim();
+    if (!linkVal) {
+      tiktokLink.classList.add('error');
+      tiktokError.style.display = 'block';
+      tiktokLink.focus();
+      return false;
+    }
+    return true;
+  }
+
+  function copyToClipboard(text){
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    // fallback for older/insecure contexts
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta);
+    return Promise.resolve();
+  }
+
+  function flashCopyNote(text){
+    copyNote.textContent = text;
+    copyNote.classList.add('active');
+    setTimeout(() => copyNote.classList.remove('active'), 4000);
+  }
+
+  // Tries to launch a native app via custom URI scheme. If the tab doesn't lose
+  // focus within the timeout (meaning no app intercepted the navigation), it runs
+  // the fallback instead. This avoids "always jumping to a bare webpage" when the
+  // app IS installed, and avoids "silently doing nothing" when it isn't.
+  function openNativeWithFallback(nativeUrl, fallback){
+    let handled = false;
+    const onBlur = () => { handled = true; };
+    window.addEventListener('blur', onBlur, { once: true });
+    window.addEventListener('visibilitychange', onBlur, { once: true });
+
+    window.location.href = nativeUrl;
+
+    setTimeout(() => {
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('visibilitychange', onBlur);
+      if (!handled) fallback();
+    }, 1200);
+  }
+
+  document.getElementById('orderBtnWA').addEventListener('click', () => {
+    if (!validateBeforeSend()) return;
+    const message = buildOrderMessage();
+    const url = `https://wa.me/${PHONE_INTL}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  });
+
+  document.getElementById('orderBtnTG').addEventListener('click', () => {
+    if (!validateBeforeSend()) return;
+    const message = buildOrderMessage();
+    copyToClipboard(message); // safety-net copy in case text prefill isn't supported on this client
+    // Opens the exact MOON Telegram account directly — no picker, one tap to send.
+    // Text prefill via ?text= works on most official Telegram apps; if a client
+    // ignores it, the message is already on the clipboard to paste in.
+    const url = `https://t.me/${TELEGRAM_USERNAME}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+    flashCopyNote(t('tgSentNote').replace('@MOON_TG', '@' + TELEGRAM_USERNAME));
+  });
+
+  // ============================================================
+  // 4) VISITOR COUNTER
+  // ============================================================
+  const visitorEl = document.getElementById('visitorBadge').querySelector('b');
+  // The old counterapi.dev v1 endpoint this used to call has become unreliable
+  // (the service migrated to a v2/workspace-based API), which is why the count
+  // used to drift apart between devices — whichever device's request failed
+  // silently fell back to its own separate local counter. This uses a single
+  // reliable global counter instead, so every device reads the same number.
+  const VISIT_KEY = 'moon_framerate_ge_total_visits_v2';
+  // The counter previously reached close to 100 visits. This baseline restores
+  // that history so the displayed number continues from roughly where it left off
+  // instead of starting back over from zero.
+  const VISITOR_BASE_OFFSET = 97;
+  const LAST_KNOWN_KEY = 'moon_visits_last_known';
+
+  // Formats large counts in compact notation, truncating (not rounding) to one
+  // decimal place: 2999 -> "2.9K", 3000 -> "3K", 1000 -> "1K",
+  // 2,999,999 -> "2.9M", 3,000,000 -> "3M", 1,000,000 -> "1M".
+  function formatVisitorCount(n){
+    n = Math.max(0, Math.floor(n));
+    if (n < 1000) return String(n);
+    if (n < 1000000) {
+      const truncated = Math.floor(n / 100) / 10;
+      const str = (truncated % 1 === 0) ? truncated.toFixed(0) : truncated.toFixed(1);
+      return str + 'K';
+    }
+    const truncated = Math.floor(n / 100000) / 10;
+    const str = (truncated % 1 === 0) ? truncated.toFixed(0) : truncated.toFixed(1);
+    return str + 'M';
+  }
+
+  function setVisitorDisplay(n){
+    const formatted = formatVisitorCount(n);
+    visitorEl.textContent = formatted;
+  }
+
+  function cacheKnownCount(n){
+    try { localStorage.setItem(LAST_KNOWN_KEY, String(n)); } catch(e){ /* ignore */ }
+  }
+
+  // If the network request fails, show the last real number this device saw
+  // (instead of incrementing a private local counter) so it doesn't drift
+  // away from what every other device is showing.
+  function showLastKnownOrBaseline(){
+    const cached = parseInt(localStorage.getItem(LAST_KNOWN_KEY) || '', 10);
+    setVisitorDisplay(!isNaN(cached) ? cached : VISITOR_BASE_OFFSET);
+  }
+
+  // Only register a new visit once per browser session — reloading the page
+  // re-reads the current value instead of counting again.
+  const alreadyCountedThisSession = sessionStorage.getItem('moon_visit_counted');
+  const endpoint = alreadyCountedThisSession
+    ? `https://countapi.mileshilliard.com/api/v1/get/${VISIT_KEY}`
+    : `https://countapi.mileshilliard.com/api/v1/hit/${VISIT_KEY}`;
+
+  fetch(endpoint)
+    .then(r => { if (!r.ok) throw new Error('bad response'); return r.json(); })
+    .then(data => {
+      const count = parseInt(data && data.value, 10);
+      if (!isNaN(count)) {
+        const displayCount = count + VISITOR_BASE_OFFSET;
+        setVisitorDisplay(displayCount);
+        cacheKnownCount(displayCount);
+        sessionStorage.setItem('moon_visit_counted', '1');
+      } else {
+        showLastKnownOrBaseline();
+      }
+    })
+    .catch(() => showLastKnownOrBaseline());
+
+  // ============================================================
+  // 5) AI ASSISTANT — free, on-device rule-based FAQ engine
+  // ============================================================
+  const chatFab = document.getElementById('chatFab');
+  const chatPanel = document.getElementById('chatPanel');
+  const chatClose = document.getElementById('chatClose');
+  const chatBody = document.getElementById('chatBody');
+  const chatInput = document.getElementById('chatInput');
+  const chatSend = document.getElementById('chatSend');
+
+  chatFab.addEventListener('click', () => {
+    chatPanel.classList.toggle('open');
+    chatFab.querySelector('.badge-dot').style.display = 'none';
+    if (chatBody.children.length === 0) botGreet();
+  });
+  chatClose.addEventListener('click', () => chatPanel.classList.remove('open'));
+
+  function addMsg(role, html){
+    const div = document.createElement('div');
+    div.className = 'msg ' + role;
+    div.innerHTML = html;
+    chatBody.appendChild(div);
+    chatBody.scrollTop = chatBody.scrollHeight;
+    return div;
+  }
+
+  function addQuickReplies(options){
+    const wrap = document.createElement('div');
+    wrap.className = 'quick-replies';
+    options.forEach(opt => {
+      const b = document.createElement('button');
+      b.className = 'qr-btn';
+      b.textContent = opt;
+      b.addEventListener('click', () => { chatInput.value = opt; sendChat(); });
+      wrap.appendChild(b);
+    });
+    chatBody.appendChild(wrap);
+    chatBody.scrollTop = chatBody.scrollHeight;
+  }
+
+  function botGreet(){
+    addMsg('bot', '🌙 გამარჯობა! ჩატის გასაგრძელებლად აირჩიე ენა 👇<br>Hi! Please choose a language to continue 👇');
+    addLangChoice();
+  }
+
+  function addLangChoice(){
+    const wrap = document.createElement('div');
+    wrap.className = 'quick-replies';
+
+    const btnKa = document.createElement('button');
+    btnKa.className = 'qr-btn';
+    btnKa.textContent = 'ქართული';
+    btnKa.addEventListener('click', () => {
+      wrap.remove();
+      addMsg('user', 'ქართული');
+      setLanguage('ka');
+      setTimeout(realGreeting, 300);
+    });
+
+    const btnEn = document.createElement('button');
+    btnEn.className = 'qr-btn';
+    btnEn.textContent = 'ENGLISH';
+    btnEn.addEventListener('click', () => {
+      wrap.remove();
+      addMsg('user', 'ENGLISH');
+      setLanguage('en');
+      setTimeout(realGreeting, 300);
+    });
+
+    wrap.appendChild(btnKa);
+    wrap.appendChild(btnEn);
+    chatBody.appendChild(wrap);
+    chatBody.scrollTop = chatBody.scrollHeight;
+  }
+
+  function realGreeting(){
+    if (currentLang === 'en') {
+      addMsg('bot', "Hi! 🌙 I'm MOON's assistant. Ask me about pricing, deadlines, video requirements, or the order process.");
+      addQuickReplies(['How much does it cost?', 'How long does it take?', 'What are the video requirements?', 'How do I place an order?']);
+    } else {
+      addMsg('bot', 'გამარჯობა! 🌙 მე ვარ MOON-ის ასისტენტი. დამისვი კითხვა ფასზე, ვადებზე, მოთხოვნებზე ან შეკვეთის პროცესზე.');
+      addQuickReplies(['რა ღირს?', 'რამდენ ხანში მზადდება?', 'რა მოთხოვნაა ვიდეოზე?', 'როგორ შევუკვეთო?']);
+    }
+  }
+
+  // Knowledge base: each rule = keywords[] + answer (+ optional quick replies)
+  const KB_KA = [
+    {
+      kw: ['ფას','ღირს','ტარიფ','რამდენი ღირს','ფასდაკლ'],
+      a: 'ფასი დამოკიდებულია ვიდეოს ხანგრძლივობაზე და ხარისხზე (1080p/60fps → 1080p/120fps → 2K/60fps → 2K/120fps → 4K/60fps → 4K/120fps). სტანდარტული 1080p/60fps ხარისხისთვის: მინ. 5 წამი → 1.30₾-დან, მაქს. 59.59 წამი → დაახლ. 13₾-მდე. მაღალი ხარისხის ფორმატები შესაბამისად ძვირდება. კალკულატორში სლაიდერით მონიშნე ხანგრძლივობა, აირჩიე ხარისხი ან ატვირთე ვიდეო — ფასი ავტომატურად გამოითვლება. გამომწერებისთვის ტარიფი დაბალია.',
+      qr: ['არხის გამოწერით რამდენით იაფდება?', 'რა მოთხოვნაა ვიდეოზე?']
+    },
+    {
+      kw: ['გამომწერ','subscriber','გამოწერ'],
+      a: 'თუ არხის გამომწერი ხარ, ჩართე გადამრთველი "ვარ არხის გამომწერი" — ფასი ავტომატურად დაბალდება ყველა ხანგრძლივობაზე.',
+    },
+    {
+      kw: ['ვად','რამდენ ხანში','მზადდება','deadline','დრო სჭირდება'],
+      a: 'სტანდარტული მონტაჟის ვადა დამოკიდებულია დატვირთვაზე — ზუსტი ვადისთვის საუკეთესოა პირდაპირ დაგვიკავშირდე შეკვეთის გაგზავნისას (WhatsApp/Telegram ღილაკებით ქვემოთ), მენეჯერი დაგიდასტურებს ვადას შეკვეთისთანავე.',
+    },
+    {
+      kw: ['მოთხოვნ','ხარისხ','1080','60fps','ფორმატ','რეზოლუც'],
+      a: 'რეკომენდირებული ფორმატია 1080×1920 რეზოლუცია, 60fps. კალკულატორში ასევე ხელმისაწვდომია 1080p/120fps, 2K/60fps, 2K/120fps, 4K/60fps და 4K/120fps ვარიანტები (მაღალი ფასით), მაგრამ არ გირჩევთ, რადგან შესაძლოა მაყურებელს ვიდეო თავისით გაუჭედოთ. ხანგრძლივობა არ უნდა აღემატებოდეს 59.59 წამს — მეტი ხანგრძლივობა ინდივიდუალურად ფასდება.',
+    },
+    {
+      kw: ['tiktok','ტიკტოკ'],
+      a: 'მონტაჟი კეთდება მხოლოდ TikTok-ის ფორმატისთვის. შეკვეთის გასაგზავნად აუცილებელია მიუთითო შენი TikTok პროფილის ლინკი ველში.',
+    },
+    {
+      kw: ['როგორ შევუკვეთო','შეკვეთ','ორდერ','დაკვეთ'],
+      a: 'შეავსე ხანგრძლივობა (ხელით ან ვიდეოს ატვირთვით), მიუთითე TikTok ლინკი, და დააჭირე WhatsApp ან Telegram ღილაკს — არჩეული პროგრამა გაიხსნება მზა შეკვეთის ტექსტით.',
+      qr: ['რომელი არხით შემიძლია შეკვეთა?']
+    },
+    {
+      kw: ['არხ','whatsapp','telegram','ტელეგრამ','ვატსაპ'],
+      a: 'შეკვეთის გაგზავნა შესაძლებელია WhatsApp ან Telegram არხზე. WhatsApp +995 592 630 630 ნომერზეა მიბმული; Telegram-ზე პირდაპირ @Moonknight0012 ანგარიშთან იხსნება ჩატი, მზა ტექსტით.',
+    },
+    {
+      kw: ['ნომერ','ტელეფონ','საკონტაქტო','დაკავშირ'],
+      a: 'საკონტაქტო ნომერი WhatsApp-სთვის: +995 592 630 630. Telegram-ზე პირდაპირ მოგვწერე: @Moonknight0012.',
+    },
+    {
+      kw: ['ატვირთ','ვიდეოს შემოწმ','scan','სკან','ხანგრძლივობის გაზომ'],
+      a: 'ზემოთ "VIDEO SCANNER" ბლოკში შეგიძლია ატვირთო ან გადმოიტანო ვიდეო ფაილი — ბრაუზერი ავტომატურად წაიკითხავს ხანგრძლივობას წამებში და მილიწამებში და თავად ჩაასვამს კალკულატორში ფასის გამოსათვლელად. ფაილი არსად იტვირთება — ყველაფერი ხდება შენს მოწყობილობაზე.',
+    },
+    {
+      kw: ['გადახდ','ანგარიშსწორ','ბარათ','ნაღდი'],
+      a: 'გადახდის დეტალებს მენეჯერი დაგიზუსტებს პირდაპირ ჩატში შეკვეთის დადასტურების შემდეგ.',
+    },
+    {
+      kw: ['გამარჯობა','სალამ','hi','hello','მოგესალმ'],
+      a: 'გამარჯობა! რითი დაგეხმარო? შეგიძლია მკითხო ფასზე, ვადებზე, მოთხოვნებზე ან შეკვეთის პროცესზე.',
+    },
+    {
+      kw: ['მადლობ','გმადლობ','thanks','thank you'],
+      a: 'იყავი მოხარული დახმარებით! 🌙 კიდევ თუ რამე გაინტერესებს — მზად ვარ.',
+    },
+    {
+      kw: ['ანუკა ბოტ','ანუკა bot','ანუკა ხელოვნურ'],
+      a: 'კი 🤖',
+    },
+    {
+      kw: ['ანუკა კარგად თამაშ','ანუკა თამაშ'],
+      a: 'არა 😄',
+    },
+    {
+      kw: ['ნინა'],
+      a: 'MOON-ის გოგოა ნინა 💜',
+    },
+    {
+      kw: ['მუნი'],
+      a: 'ნინას ბიჭია MOON 🌙',
+    },
+  ];
+
+  const KB_EN = [
+    {
+      kw: ['price','cost','how much','rate','discount'],
+      a: 'The price depends on both video duration and quality (1080p/60fps → 1080p/120fps → 2K/60fps → 2K/120fps → 4K/60fps → 4K/120fps). For the standard 1080p/60fps format: min. 5 seconds → from 1.30₾, max. 59.59 seconds → up to about 13₾. Higher-quality formats cost proportionally more. Use the slider in the calculator to set the duration, pick a quality, or upload a video — the price is calculated automatically. Subscribers get a lower rate.',
+      qr: ['How much cheaper for subscribers?', 'What are the video requirements?']
+    },
+    {
+      kw: ['subscriber','subscribe','subscription'],
+      a: 'If you\'re a channel subscriber, turn on the "I\'m a channel subscriber" toggle — the price automatically drops for every duration.',
+    },
+    {
+      kw: ['deadline','how long','turnaround','time does it take','when will it be ready'],
+      a: 'The standard editing turnaround depends on current workload — for an exact deadline it\'s best to contact us directly when sending your order (WhatsApp/Telegram buttons below); a manager will confirm the deadline right after you order.',
+    },
+    {
+      kw: ['requirement','quality','1080','60fps','format','resolution'],
+      a: 'The recommended format is 1080×1920 resolution at 60fps. The calculator also offers 1080p/120fps, 2K/60fps, 2K/120fps, 4K/60fps and 4K/120fps (at a higher price), but we don\'t recommend them, since the video may glitch on its own for viewers. Duration must not exceed 59.59 seconds — anything longer is priced individually.',
+    },
+    {
+      kw: ['tiktok'],
+      a: 'Editing is done only for the TikTok format. To send an order you must provide your TikTok profile link in the field.',
+    },
+    {
+      kw: ['how to order','place an order','order process','how do i order'],
+      a: 'Fill in the duration (manually or by uploading a video), enter your TikTok link, and press the WhatsApp or Telegram button — the chosen app will open with a ready-made order message.',
+      qr: ['Which channel can I order through?']
+    },
+    {
+      kw: ['channel','whatsapp','telegram'],
+      a: 'You can send your order via WhatsApp or Telegram. WhatsApp is linked to +995 592 630 630; Telegram opens a chat directly with @Moonknight0012, with the message pre-filled.',
+    },
+    {
+      kw: ['number','phone','contact'],
+      a: 'Contact number for WhatsApp: +995 592 630 630. On Telegram, message us directly: @Moonknight0012.',
+    },
+    {
+      kw: ['upload','check video','scan','measure duration'],
+      a: 'In the "VIDEO SCANNER" block above you can upload or drag in a video file — the browser will automatically read the duration in seconds and milliseconds and fill it into the calculator to compute the price. The file is never uploaded anywhere — everything happens on your device.',
+    },
+    {
+      kw: ['payment','pay','card','cash'],
+      a: 'A manager will confirm payment details directly in chat after your order is confirmed.',
+    },
+    {
+      kw: ['hi','hello','hey'],
+      a: 'Hello! How can I help? You can ask me about pricing, deadlines, requirements, or the order process.',
+    },
+    {
+      kw: ['thanks','thank you'],
+      a: 'Happy to help! 🌙 If anything else comes up — I\'m here.',
+    },
+  ];
+
+  // Small built-in geography trivia, so the assistant isn't limited to only
+  // MOON-related topics. This is a hand-written lookup table, not a live AI
+  // model — it only knows what's listed here.
+  const CAPITALS_KA = {
+    'საქართველო': 'თბილისი',
+    'რუსეთ': 'მოსკოვი',
+    'საფრანგეთ': 'პარიზი',
+    'გერმანი': 'ბერლინი',
+    'იტალი': 'რომი',
+    'ესპანეთ': 'მადრიდი',
+    'თურქეთ': 'ანკარა',
+    'აშშ': 'ვაშინგტონი',
+    'ამერიკ': 'ვაშინგტონი',
+    'ინგლის': 'ლონდონი',
+    'ბრიტანეთ': 'ლონდონი',
+    'იაპონი': 'ტოკიო',
+    'ჩინეთ': 'პეკინი',
+    'უკრაინ': 'კიევი',
+    'სომხეთ': 'ერევანი',
+    'აზერბაიჯან': 'ბაქო',
+    'პოლონეთ': 'ვარშავა',
+    'ბერძნეთ': 'ათენი',
+  };
+
+  const CAPITALS_EN = {
+    'georgia': 'Tbilisi',
+    'russia': 'Moscow',
+    'france': 'Paris',
+    'germany': 'Berlin',
+    'italy': 'Rome',
+    'spain': 'Madrid',
+    'turkey': 'Ankara',
+    'usa': 'Washington, D.C.',
+    'united states': 'Washington, D.C.',
+    'america': 'Washington, D.C.',
+    'england': 'London',
+    'britain': 'London',
+    'uk': 'London',
+    'japan': 'Tokyo',
+    'china': 'Beijing',
+    'ukraine': 'Kyiv',
+    'armenia': 'Yerevan',
+    'azerbaijan': 'Baku',
+    'poland': 'Warsaw',
+    'greece': 'Athens',
+  };
+
+  function findCapitalAnswer(lowerText){
+    if (currentLang === 'en') {
+      if (!lowerText.includes('capital')) return null;
+      for (const country in CAPITALS_EN) {
+        if (lowerText.includes(country)) {
+          return `The capital is: ${CAPITALS_EN[country]} 🌍`;
+        }
+      }
+      return 'Name a specific country and I\'ll tell you its capital 🌍 (e.g. "capital of Georgia").';
+    }
+    if (!lowerText.includes('დედაქალაქ')) return null;
+    for (const country in CAPITALS_KA) {
+      if (lowerText.includes(country)) {
+        return `დედაქალაქია: ${CAPITALS_KA[country]} 🌍`;
+      }
+    }
+    return 'დაასახელე კონკრეტული ქვეყანა და გეტყვი დედაქალაქს 🌍 (მაგ: "საქართველოს დედაქალაქი").';
+  }
+
+  function findAnswer(text){
+    const lowerText = text.toLowerCase();
+    const kb = currentLang === 'en' ? KB_EN : KB_KA;
+    for (const rule of kb) {
+      if (rule.kw.some(k => lowerText.includes(k))) return rule;
+    }
+    return null;
+  }
+
+  function sendChat(){
+    const text = chatInput.value.trim();
+    if (!text) return;
+    addMsg('user', text.replace(/</g,'&lt;'));
+    chatInput.value = '';
+
+    setTimeout(() => {
+      const rule = findAnswer(text);
+      if (rule) {
+        addMsg('bot', rule.a);
+        if (rule.qr) addQuickReplies(rule.qr);
+        return;
+      }
+      const capitalAnswer = findCapitalAnswer(text.toLowerCase());
+      if (capitalAnswer) {
+        addMsg('bot', capitalAnswer);
+        return;
+      }
+      if (currentLang === 'en') {
+        addMsg('bot', "I don't know that specific detail — but I can help with pricing, deadlines, video requirements, or the order process. Or contact us directly using the buttons below.");
+        addQuickReplies(['How much does it cost?', 'How do I place an order?']);
+      } else {
+        addMsg('bot', 'ეს კონკრეტული დეტალი ჩემთვის უცნობია — მაგრამ შემიძლია დაგეხმარო ფასის, ვადების, ვიდეოს მოთხოვნების ან შეკვეთის პროცესთან დაკავშირებით. ან პირდაპირ დაგვიკავშირდი ღილაკებით ქვემოთ.');
+        addQuickReplies(['რა ღირს?', 'როგორ შევუკვეთო?']);
+      }
+    }, 350);
+  }
+
+  chatSend.addEventListener('click', sendChat);
+  chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+
+  // ============================================================
+  // 6) PRICE COMPARISON CHART
+  // ============================================================
+  function renderPriceChart(){
+    const container = document.getElementById('priceChart');
+    if (!container) return;
+    const { s, ms, isSub } = currentValues();
+    const qualities = Object.keys(QUALITY_SCALES);
+    const prices = qualities.map(q => parseFloat(calculateExactPrice(s, ms, isSub, q)));
+    const maxPrice = Math.max(...prices, 0.01);
+    container.innerHTML = qualities.map((q, i) => {
+      const price = prices[i];
+      const pct = Math.max(6, Math.round((price / maxPrice) * 100));
+      const isActive = q === currentQuality;
+      return '<div class="chart-row' + (isActive ? ' active' : '') + '">' +
+        '<div class="cr-name">' + QUALITY_LABELS[q] + '</div>' +
+        '<div class="cr-track"><div class="cr-fill" style="width:' + pct + '%"></div></div>' +
+        '<div class="cr-price">' + price.toFixed(2) + '₾</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // ============================================================
+  // 7) SHARED BACKEND — lightweight anonymous JSON store used to
+  // sync the admin visit log across every visitor's
+  // browser (this site has no server of its own, so this fills that
+  // gap). Reads/writes a small number of fixed paths under one
+  // namespace; failures are silent and never block the page.
+  // ============================================================
+  const MDB_BASE = 'https://mantledb.sh/v2';
+  const MDB_NS = 'moonge-tbilisi-vc7f3q';
+
+  async function mdbRead(path){
+    try{
+      const r = await fetch(MDB_BASE + '/' + MDB_NS + '/' + path, { cache: 'no-store' });
+      if (!r.ok) return null;
+      return await r.json();
+    } catch(e){ return null; }
+  }
+  async function mdbWrite(path, data){
+    try{
+      const r = await fetch(MDB_BASE + '/' + MDB_NS + '/' + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      return r.ok;
+    } catch(e){ return false; }
+  }
+
+
+  // ============================================================
+  // 8) VISITOR LOG (device + approximate location) — feeds the
+  // admin panel's "Visitors" tab. Logged once per browser session.
+  // ============================================================
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+  function formatVisitDate(ts){
+    try{
+      return new Date(ts).toLocaleString(currentLang === 'ka' ? 'ka-GE' : 'en-GB', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    } catch(e){ return ''; }
+  }
+
+  function detectDevice(){
+    const ua = navigator.userAgent || '';
+    let os = 'Unknown OS';
+    if (/Windows/i.test(ua)) os = 'Windows';
+    else if (/iPhone|iPad|iPod/i.test(ua)) os = 'iOS';
+    else if (/Android/i.test(ua)) os = 'Android';
+    else if (/Mac OS X/i.test(ua)) os = 'macOS';
+    else if (/Linux/i.test(ua)) os = 'Linux';
+
+    let browser = 'Unknown';
+    if (/Edg\//i.test(ua)) browser = 'Edge';
+    else if (/OPR\//i.test(ua)) browser = 'Opera';
+    else if (/Chrome\//i.test(ua) && !/Chromium/i.test(ua)) browser = 'Chrome';
+    else if (/Safari\//i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
+    else if (/Firefox\//i.test(ua)) browser = 'Firefox';
+
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
+    return os + ' · ' + browser + (isMobile ? ' · Mobile' : ' · Desktop');
+  }
+
+  async function detectLocation(){
+    try{
+      const r = await fetch('https://ipapi.co/json/');
+      if (!r.ok) throw new Error('bad response');
+      const data = await r.json();
+      if (data && data.city) return data.city + (data.country_name ? ', ' + data.country_name : '');
+      return 'Unknown';
+    } catch(e){ return 'Unknown'; }
+  }
+
+  async function logVisit(){
+    if (sessionStorage.getItem('moon_visit_logged')) return;
+    sessionStorage.setItem('moon_visit_logged', '1');
+    const device = detectDevice();
+    const location = await detectLocation();
+    const entry = { ts: Date.now(), device, location };
+    const fresh = await mdbRead('visits');
+    const list = (fresh && Array.isArray(fresh.list)) ? fresh.list : [];
+    const updated = [entry, ...list].slice(0, 300);
+    mdbWrite('visits', { list: updated });
+  }
+
+  logVisit();
+
+  // ============================================================
+  // 9) ADMIN PANEL — gated with a password, shows the visit log.
+  // ============================================================
+  const ADMIN_PASSWORD = '0070';
+  const adminGear = document.getElementById('adminGear');
+  const adminOverlay = document.getElementById('adminOverlay');
+  const adminLogin = document.getElementById('adminLogin');
+  const adminDashboard = document.getElementById('adminDashboard');
+  const adminPass = document.getElementById('adminPass');
+  const adminGo = document.getElementById('adminGo');
+  const adminErr = document.getElementById('adminErr');
+  const adminTabVisits = document.getElementById('adminTabVisits');
+  const adminPanelVisits = document.getElementById('adminPanelVisits');
+
+  function openAdmin(){
+    adminOverlay.classList.add('open');
+    adminLogin.style.display = 'block';
+    adminDashboard.style.display = 'none';
+    adminPass.value = '';
+    adminErr.classList.remove('show');
+  }
+  function closeAdmin(){
+    adminOverlay.classList.remove('open');
+  }
+
+  // Tutorial panel toggle
+  const tutorialPanel = document.getElementById('tutorialPanel');
+  const tutorialToggleHead = document.getElementById('tutorialToggleHead');
+  if (tutorialPanel && tutorialToggleHead) {
+    tutorialToggleHead.addEventListener('click', () => {
+      tutorialPanel.classList.toggle('open');
+    });
+  }
+
+  if (adminGear) adminGear.addEventListener('click', openAdmin);
+  document.getElementById('adminCloseLogin').addEventListener('click', closeAdmin);
+  document.getElementById('adminCloseDash').addEventListener('click', closeAdmin);
+  adminOverlay.addEventListener('click', (e) => { if (e.target === adminOverlay) closeAdmin(); });
+
+  async function renderAdminVisits(){
+    adminPanelVisits.innerHTML = '<div class="c-empty">…</div>';
+    const data = await mdbRead('visits');
+    const list = (data && Array.isArray(data.list)) ? data.list : [];
+    if (!list.length) {
+      adminPanelVisits.innerHTML = '<div class="c-empty">' + t('adminNoVisits') + '</div>';
+      return;
+    }
+    adminPanelVisits.innerHTML = list.map(v =>
+      '<div class="a-visit-row"><span>' + formatVisitDate(v.ts) + '</span><b>' + escapeHtml(v.location || 'Unknown') + '</b><span>' + escapeHtml(v.device || '') + '</span></div>'
+    ).join('');
+  }
+
+  function tryAdminLogin(){
+    if (adminPass.value === ADMIN_PASSWORD) {
+      adminLogin.style.display = 'none';
+      adminDashboard.style.display = 'block';
+      renderAdminVisits();
+    } else {
+      adminErr.classList.add('show');
+    }
+  }
+  adminGo.addEventListener('click', tryAdminLogin);
+  adminPass.addEventListener('keydown', e => { if (e.key === 'Enter') tryAdminLogin(); });
+
+  // Apply the saved/default language once everything is wired up.
+  applyTranslations();
+</script>
+
+</body>
+</html>
