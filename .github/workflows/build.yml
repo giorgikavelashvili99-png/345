@@ -1,1 +1,42 @@
+name: Build Flutter APK
 
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.22.x'
+
+    - name: Setup & Build APK
+      run: |
+        flutter create ping_app --org com.ping.stabilizer
+        cd ping_app
+        cp ../main.dart lib/main.dart
+        flutter pub add wireguard_flutter device_apps
+        sed -i 's/minSdkVersion.*/minSdkVersion 21/' android/app/build.gradle
+        PERMS='<uses-permission android:name="android.permission.INTERNET"/>\n<uses-permission android:name="android.permission.BIND_VPN_SERVICE"/>\n<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>'
+        sed -i "/<manifest/a $PERMS" android/app/src/main/AndroidManifest.xml
+        flutter build apk --release
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ping-stabilizer-apk
+        path: ping_app/build/app/outputs/flutter-apk/app-release.apk
