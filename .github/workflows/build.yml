@@ -24,15 +24,25 @@ jobs:
       with:
         flutter-version: '3.22.x'
 
-    - name: Setup & Build APK
+    - name: Create Flutter App and Apply Fixes
       run: |
+        # 1. ახალი აპლიკაციის შექმნა
         flutter create ping_app --org com.ping.stabilizer
         cd ping_app
+
+        # 2. შენი main.dart-ის ჩასმა
         cp ../main.dart lib/main.dart
+
+        # 3. ბიბლიოთეკების დამატება
         flutter pub add wireguard_flutter device_apps
-        sed -i 's/minSdkVersion.*/minSdkVersion 21/' android/app/build.gradle
-        PERMS='<uses-permission android:name="android.permission.INTERNET"/>\n<uses-permission android:name="android.permission.BIND_VPN_SERVICE"/>\n<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>'
-        sed -i "/<manifest/a $PERMS" android/app/src/main/AndroidManifest.xml
+
+        # 4. minSdkVersion=21-ის მითითება სტანდარტული გზით
+        echo "flutter.minSdkVersion=21" >> android/local.properties
+
+        # 5. VPN უფლებების უსაფრთხო ჩამატება Manifest-ში
+        sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.BIND_VPN_SERVICE"/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>' android/app/src/main/AndroidManifest.xml
+
+        # 6. APK-ს აწყობა
         flutter build apk --release
 
     - name: Upload APK Artifact
@@ -40,3 +50,4 @@ jobs:
       with:
         name: ping-stabilizer-apk
         path: ping_app/build/app/outputs/flutter-apk/app-release.apk
+        
