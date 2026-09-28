@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ნინა 💌</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Georgian:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--card:#101010;--line:#242424;--tx:#f4f4f5;--mut:#8d8d96;--rose:#ff3b6b;--green:#22c55e}
+*{box-sizing:border-box}
+html,body{margin:0;background:#000;color:var(--tx)}
+body{min-height:100dvh;display:grid;place-items:center;padding:calc(48px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));font-family:'Noto Sans Georgian',system-ui,sans-serif;overflow-x:hidden}
+.card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);border-radius:24px;padding:0 24px 28px;text-align:center;position:relative;margin-top:28px}
+.card.adm{max-width:460px;padding-top:28px;text-align:left}
+.badge{width:56px;height:56px;border-radius:50%;background:var(--rose);display:grid;place-items:center;font-size:26px;margin:-28px auto 18px}
+.badge.ok{background:#12351f;color:var(--green);font-weight:800}
+h1{font-size:24px;line-height:1.3;margin:0 0 8px;color:#ff6b8f;font-weight:800}
+.okh{color:var(--green)}
+.sub{color:var(--mut);font-size:14px;margin:0 0 24px;line-height:1.5}
+.hint{color:var(--mut);font-size:13px;min-height:18px;margin:16px 0 0}
+.big{font-size:17px;margin:20px 0 6px}
+.btn{border:0;border-radius:14px;padding:14px 22px;font:inherit;font-weight:600;cursor:pointer;color:#fff;transition:transform .15s}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.primary{background:linear-gradient(90deg,#ff5c85,#ff3b6b)}
+.wide{width:100%}
+.yes{background:var(--green);color:#03140a;font-weight:800}
+.no{background:#1c1c1f;color:#d4d4d8;transition:transform .25s}
+.row{display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;min-height:70px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.opt{background:#161618;border:1px solid var(--line);border-radius:16px;padding:16px 8px;color:inherit;font:inherit;font-size:14px;cursor:pointer;display:flex;flex-direction:column;gap:6px;align-items:center}
+.opt span:first-child{font-size:26px}
+.opt:hover{border-color:var(--rose)}
+.opt.sel{border-color:var(--rose);background:#2a0f18}
+.opt:last-child:nth-child(odd){grid-column:1/-1}
+h1{-webkit-user-select:none;user-select:none;touch-action:manipulation}
+.pop{position:fixed;inset:0;background:rgba(0,0,0,.78);display:grid;place-items:center;padding:24px;z-index:20;animation:in .25s ease}
+.pop .box{max-width:340px;background:var(--card);border:1px solid var(--rose);border-radius:24px;padding:28px 22px;text-align:center}
+.pop .ic{font-size:36px}
+.pop h2{margin:8px 0;color:#ff6b8f;font-size:22px}
+.pop p{margin:0;line-height:1.5}
+input{width:100%;background:#161618;border:1px solid var(--line);border-radius:12px;padding:14px;color:var(--tx);font:inherit;color-scheme:dark;margin-bottom:12px}
+input::placeholder{color:#5f5f68}
+button:focus-visible,input:focus-visible{outline:2px solid var(--rose);outline-offset:2px}
+.sum{background:#161618;border-radius:16px;padding:6px 16px;text-align:left}
+.sum div{padding:10px 0;border-bottom:1px solid var(--line)}
+.sum div:last-child{border:0}
+.sum small,.item small{display:block;color:var(--mut);font-size:12px}
+.sum b{font-weight:600;color:#ff6b8f}
+.link{background:none;border:0;color:var(--mut);text-decoration:underline;font:inherit;font-size:13px;cursor:pointer;margin-top:8px}
+.item{background:#161618;border-radius:16px;padding:14px 16px;margin-bottom:12px}
+.item .top{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px;font-size:13px}
+.tag{font-size:12px;padding:3px 10px;border-radius:99px;background:#2a2a2e;color:#d4d4d8}
+.tag.d{background:#12351f;color:var(--green)}
+.item .f{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-top:8px}
+.item b{font-weight:600;word-break:break-word}
+.step{animation:in .35s ease}
+@keyframes in{from{opacity:0;transform:translateY(8px)}}
+.fall{position:fixed;top:-40px;pointer-events:none;animation:fall linear forwards;z-index:9}
+@keyframes fall{to{transform:translateY(115vh) rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.fall{display:none}.step{animation:none}}
+</style>
+</head>
+<body>
+<main class="card" id="card"></main>
+<script>
+/* პასუხების შენახვა სხვა მოწყობილობიდან ნახვისთვის:
+   ჩასვი Firebase Realtime Database-ის მისამართი, მაგ. 'https://შენი-პროექტი-default-rtdb.firebaseio.com'
+   თუ ცარიელია, პასუხები მხოლოდ ამ მოწყობილობაზე ინახება. */
+const DB_URL = '';
+
+const $ = s => document.querySelector(s);
+const card = $('#card');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LS = 'nina_answers';
+const newRec = () => ({id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t: new Date().toISOString(), nos: 0, step: 'intro', done: false});
+let rec = newRec();
+
+function localAll(){ try { return JSON.parse(localStorage.getItem(LS) || '{}'); } catch(e){ return {}; } }
+function save(patch){
+  Object.assign(rec, patch, {u: new Date().toISOString()});
+  try { const a = localAll(); a[rec.id] = rec; localStorage.setItem(LS, JSON.stringify(a)); } catch(e){}
+  if (DB_URL) fetch(DB_URL + '/answers/' + rec.id + '.json', {method:'PUT', body: JSON.stringify(rec), keepalive:true}).catch(()=>{});
+}
+async function loadAll(){
+  let all = localAll();
+  if (DB_URL) { try { const d = await (await fetch(DB_URL + '/answers.json')).json(); if (d) all = {...all, ...d}; } catch(e){} }
+  return Object.values(all).sort((a, b) => (b.t || '').localeCompare(a.t || ''));
+}
+
+const show = html => { card.innerHTML = '<div class="step">' + html + '</div>'; };
+const head = (ico, h, s) => `<div class="badge">${ico}</div><h1>${h}</h1>${s ? `<p class="sub">${s}</p>` : ''}`;
+
+function intro(){
+  show(head('💌', 'გამარჯობა, ნინა!', 'ერთი პატარა კითხვა მაქვს შენთვის.') + '<button class="btn primary" id="go">რა კითხვა?</button>');
+  $('#go').onclick = ask;
+}
+
+const noTxt = ['არა','დარწმუნებული ხარ?','ბოლო შანსი!','ნუ ნაზობ 😏','გული მატკინე 🥺','იქნებ მაინც კი?'];
+const hints = ['','ნუ მაწვალებ, დააჭირე „კი“-ს 🥹','ჰეი, ნუ ნაზობ! 😌','ისედაც იცი პასუხს 😏','ნინა, გთხოვ 🥺','ეს ღილაკი მაინც ვერ დაგიჭერს 😁'];
+
+function ask(){
+  save({step:'ask'});
+  show(head('💗', 'ნინა, გამომყვები დეითზე?', 'გპირდები, საჭმელს მე გადავიხდი 😌') +
+    '<div class="row"><button class="btn yes" id="yes">კი 💖</button><button class="btn no" id="no">არა</button></div><p class="hint" id="hint"></p>');
+  const yes = $('#yes'), no = $('#no'); let n = 0;
+  const dodge = e => {
+    if (e.type === 'pointerenter' && e.pointerType !== 'mouse') return;
+    e.preventDefault(); n++;
+    save({nos: (rec.nos || 0) + 1});
+    no.textContent = noTxt[Math.min(n, noTxt.length - 1)];
+    $('#hint').textContent = hints[Math.min(n, hints.length - 1)];
+    yes.style.fontSize = Math.min(16 + n * 4, 44) + 'px';
+    yes.style.padding = (14 + n * 3) + 'px ' + (22 + n * 6) + 'px';
+    no.style.transform = `translate(${(Math.random() * 2 - 1) * 60}px,${(Math.random() * 2 - 1) * 40}px)`;
+    if (n >= 8) no.hidden = true;
+  };
+  no.addEventListener('pointerenter', dodge);
+  no.addEventListener('pointerdown', dodge);
+  no.addEventListener('click', e => e.preventDefault());
+  yes.onclick = () => { save({answer:'yes'}); yay(); };
+}
+
+function rain(){
+  for (let i = 0; i < 36; i++) {
+    const s = document.createElement('span');
+    s.className = 'fall'; s.textContent = ['💖','❤️','💗','✨'][i % 4];
+    s.style.left = Math.random() * 100 + 'vw';
+    s.style.animationDuration = 2.5 + Math.random() * 2 + 's';
+    s.style.animationDelay = Math.random() * .8 + 's';
+    s.style.fontSize = 16 + Math.random() * 18 + 'px';
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 5500);
+  }
+}
+function yay(){
+  save({step:'yay'});
+  show('<div class="badge">🥰</div><h1>იეეეს!!!</h1><p class="big">💗 💗 💗</p><p class="sub">მე ახლა ყველაზე ბედნიერი ვარ.<br>ეს ოფიციალურად დეითია! 😌</p>');
+  rain();
+  setTimeout(stepType, 2400);
+}
+
+function choose(step, ico, h, s, opts, key, next){
+  save({step});
+  show(head(ico, h, s) + '<div class="grid">' + opts.map(o => `<button class="opt" data-v="${esc(o[1])}"><span>${o[0]}</span><span>${o[1]}</span></button>`).join('') + '</div>');
+  card.querySelectorAll('.opt').forEach(b => b.onclick = () => { b.classList.add('sel'); save({[key]: b.dataset.v}); setTimeout(() => next(b.dataset.v), 250); });
+}
+const stepType = () => choose('type','☕','როგორი დეითი გინდა?','აირჩიე ერთი',[['☕','ყავა'],['🍽️','ვახშამი'],['🎬','კინო'],['🖼️','მუზეუმი / გალერეა'],['🌿','ბუნება'],['🎮','თამაშები']],'type',v => subs[v] ? stepSub(v) : stepPlace());
+const stepPlace = () => choose('place','📍','სად წავიდეთ?','აირჩიე, რაც მოგეწონება',[['📍','შენი საყვარელი ადგილი'],['🎁','სიურპრიზი იქნება!'],['✨','ახალი ადგილი მინდა'],['🌙','სადმე მშვიდ ადგილას']],'place',stepWhen);
+
+const subs = {
+  'ყავა': {ico:'☕', h:'როგორი ყავა?', s:'აირჩიე ერთი', opts:[['🫖','ნალექიანი'],['✨','უნალექო']]},
+  'ვახშამი': {ico:'🍽️', h:'რას ვჭამთ?', s:'აირჩიე, რაც გერჩივნება', opts:[['🥟','ხინკალი'],['🍢','მწვადი'],['🍽️','ატრია'],['🥗','ცეზარი'],['🥔','მექსიკური კარტოფილი'],['🍝','პასტა']]},
+  'კინო': {ico:'🎬', h:'რომელ ფილმზე წავიდეთ?', s:'სხვა ვარიანტი არ არსებობს, ჩემო სექსუალურო 😘', opts:[['🎬','დუმსდეი']]},
+  'თამაშები': {ico:'🎮', h:'რას ვთამაშობთ?', s:'აირჩიე თამაში', opts:[['🔫','პაბჯი'],['🍑','ტრაკის თამაში'],['👑','ქლეშ როიალი']]}
+};
+function stepSub(t){
+  const o = subs[t];
+  choose('sub', o.ico, o.h, o.s, o.opts, 'detail', v => v === 'ნალექიანი' ? sediment() : stepPlace());
+}
+function sediment(){
+  const p = document.createElement('div');
+  p.className = 'pop'; p.setAttribute('role', 'status');
+  p.innerHTML = '<div class="box"><div class="ic">😌</div><h2>მშვენიერია!</h2><p>მაგრამ მე არ მიყვარს, ამიტომ მე უნალექოს ვგლიჯავ 😌</p></div>';
+  document.body.appendChild(p);
+  setTimeout(() => { p.remove(); stepPlace(); }, 3000);
+}
+
+function stepWhen(){
+  save({step:'when'});
+  show(head('📅','როდის ხარ თავისუფალი?','აირჩიე დღე და საათი') +
+    '<input type="date" id="d" aria-label="თარიღი"><input type="time" id="tm" aria-label="საათი"><button class="btn primary wide" id="nx" disabled>შემდეგ</button>');
+  const d = $('#d'), tm = $('#tm'), nx = $('#nx');
+  d.min = new Date().toISOString().slice(0, 10);
+  d.oninput = tm.oninput = () => nx.disabled = !(d.value && tm.value);
+  nx.onclick = () => { save({date: d.value, time: tm.value}); stepContact(); };
+}
+
+function stepContact(){
+  save({step:'contact'});
+  show(head('💬','როგორ დაგიკავშირდე?','დატოვე ნომერი ან ინსტაგრამი') +
+    '<input id="c" placeholder="ტელეფონი, ინსტაგრამი..." autocomplete="off"><button class="btn primary wide" id="sd" disabled>გაგზავნა ✈️</button>');
+  const c = $('#c'), sd = $('#sd');
+  c.oninput = () => sd.disabled = !c.value.trim();
+  sd.onclick = () => { save({contact: c.value.trim(), step:'done', done:true}); fin(); };
+}
+
+function fin(){
+  const rows = [['დეითის ტიპი', rec.type], ['არჩევანი', rec.detail], ['ადგილი', rec.place], ['დრო', rec.date + ', ' + rec.time], ['კონტაქტი', rec.contact]].filter(r => r[1]);
+  show('<div class="badge ok">✓</div><h1 class="okh">შესანიშნავია! 🎉</h1><div class="sum">' +
+    rows.map(r => `<div><small>${r[0]}</small><b>${esc(r[1])}</b></div>`).join('') +
+    '</div><p class="big">მალე დაგიკავშირდები 💌</p><p class="sub">დეითს ველოდები! 🥰</p><button class="link" id="again">თავიდან</button>');
+  rain();
+  $('#again').onclick = () => { rec = newRec(); intro(); };
+}
+
+/* ადმინ პანელი: გახსენი ბმული + #admin (მაგ. index.html#admin) */
+function admin(){
+  show(head('🔒','ადმინ პანელი','შეიყვანე პაროლი') +
+    '<input id="pw" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="პაროლი" style="-webkit-text-security:disc"><button class="btn primary wide" id="in">შესვლა</button><p class="hint" id="err"></p>');
+  const go = () => { if ($('#pw').value === '12') list(); else $('#err').textContent = 'პაროლი არასწორია'; };
+  $('#in').onclick = go;
+  $('#pw').onkeydown = e => { if (e.key === 'Enter') go(); };
+  $('#pw').oninput = () => { if ($('#pw').value.trim() === '12') list(); };
+  setTimeout(() => $('#pw').focus(), 50);
+}
+const stepName = {intro:'გახსნა',ask:'კითხვაზე',yay:'სიხარულზე',type:'დეითის ტიპზე',sub:'არჩევანზე',place:'ადგილზე',when:'დროზე',contact:'კონტაქტზე'};
+async function list(){
+  show('<h1>პასუხები</h1><p class="sub" id="cnt">იტვირთება...</p><div id="items"></div><div class="row"><button class="btn no" id="rf">განახლება</button><button class="btn no" id="ex">გასვლა</button></div><div class="row"><button class="link" id="cl">ყველას წაშლა</button></div>');
+  $('#cl').onclick = async () => {
+    if (!confirm('ყველა პასუხი წაიშლება. დარწმუნებული ხარ?')) return;
+    try { localStorage.removeItem(LS); } catch(e){}
+    if (DB_URL) { try { await fetch(DB_URL + '/answers.json', {method:'DELETE'}); } catch(e){} }
+    list();
+  };
+  $('#rf').onclick = list; $('#ex').onclick = () => { location.hash = ''; };
+  const all = await loadAll();
+  $('#cnt').textContent = all.length ? 'სულ: ' + all.length : 'ჯერ პასუხი არ არის';
+  const f = (l, v) => `<div><small>${l}</small><b>${esc(v || '—')}</b></div>`;
+  $('#items').innerHTML = all.map(r => `<div class="item"><div class="top"><b>${esc(new Date(r.t).toLocaleString('ka-GE'))}</b><span class="tag ${r.done ? 'd' : ''}">${r.done ? 'დასრულებულია' : 'შეჩერდა: ' + esc(stepName[r.step] || r.step)}</span></div>
+    <div class="f">${f('პასუხი', r.answer === 'yes' ? 'კი 💖' : '')}${f('„არა“-ზე დაჭერა', r.nos)}${f('დეითის ტიპი', r.type)}${f('არჩევანი', r.detail)}${f('ადგილი', r.place)}${f('დრო', r.date ? r.date + ', ' + r.time : '')}${f('კონტაქტი', r.contact)}</div></div>`).join('');
+}
+
+/* ადმინისკენ: სათაურზე სწრაფად 3-ჯერ დაჭერა */
+let taps = 0, tapTimer;
+card.addEventListener('click', e => {
+  if (location.hash === '#admin' || !e.target.closest('h1')) return;
+  taps++; clearTimeout(tapTimer); tapTimer = setTimeout(() => taps = 0, 1500);
+  if (taps >= 3) { taps = 0; location.hash = '#admin'; }
+});
+
+function route(){
+  const a = location.hash === '#admin';
+  card.classList.toggle('adm', a);
+  if (a) admin(); else { rec = newRec(); intro(); }
+}
+addEventListener('hashchange', route);
+route();
+</script>
+</body>
+</html>
